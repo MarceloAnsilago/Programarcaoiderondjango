@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Cadastro de Servidores{% endblock %}
+{% block content %}
+    <h2>Cadastro de Servidores</h2>
+    {% if msg %}
+        <div class="alert alert-success">{{ msg }}</div>
+    {% endif %}
+    <form method="post" class="mt-4" autocomplete="off">
+        {% csrf_token %}
+        <div class="row g-3">
+            <div class="col-md-6">{{ form.nome.label_tag }}{{ form.nome }}</div>
+            <div class="col-md-6">{{ form.telefone.label_tag }}{{ form.telefone }}</div>
+            <div class="col-md-6">{{ form.cargo.label_tag }}{{ form.cargo }}</div>
+            <div class="col-md-6">{{ form.matricula.label_tag }}{{ form.matricula }}</div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-3">Cadastrar</button>
+    </form>
+{% endblock %}
