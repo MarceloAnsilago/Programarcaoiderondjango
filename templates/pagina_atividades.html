@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-center my-4">Cadastro de Atividades</h2>
+{% if mensagem %}
+  <div class="alert alert-success">{{ mensagem }}</div>
+{% endif %}
+<form method="POST" class="row g-3 mt-4" autocomplete="off">
+    {% csrf_token %}
+    <div class="col-md-6">
+        <input name="nome" class="form-control" placeholder="Nome da atividade" required>
+    </div>
+    <div class="col-md-3">
+        <select name="classificacao" class="form-select" required>
+            <option value="">Selecione a classificação</option>
+            <option value="ANIMAL">Animal</option>
+            <option value="VEGETAL">Vegetal</option>
+            <option value="APOIO">Apoio</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select name="status" class="form-select" required>
+            <option value="Ativo">Ativo</option>
+            <option value="Inativo">Inativo</option>
+        </select>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2-circle"></i> Cadastrar
+        </button>
+    </div>
+</form>
+
+<hr>
+<h4>Atividades cadastradas:</h4>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Classificação</th>
+            <th>Status</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for a in atividades %}
+        <tr>
+            <td>{{ a.nome }}</td>
+            <td>{{ a.classificacao }}</td>
+            <td>{{ a.status }}</td>
+            <td>
+                <!-- Excluir -->
+                <form method="post" action="{% url 'excluir_atividade' a.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+                </form>
+                <!-- Editar -->
+                <a href="{% url 'editar_atividade' a.id %}" class="btn btn-warning btn-sm">Editar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

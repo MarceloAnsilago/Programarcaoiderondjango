@@ -12,7 +12,7 @@
             width: 260px;
             min-width: 200px;
             min-height: 100vh;
-            background: #212529;
+            background: #073074;
             color: #fff;
             transition: width 0.2s, min-width 0.2s;
             position: relative;
@@ -63,7 +63,7 @@
             background: #fff;
             border: 1.5px solid #ced4da;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,.03);
+            box-shadow: 0 2px 8px rgba(46, 14, 14, 0.03);
             padding: 7px 13px;
             font-size: 1.4rem;
             transition: background 0.2s, border 0.2s;
@@ -100,12 +100,12 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="/atividades/" class="nav-link {% if request.path == '/atividades/' %}active{% endif %}">
                         <i class="bi bi-clipboard-data"></i> Atividades
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="/veiculos/" class="nav-link {% if request.path == '/veiculos/' %}active{% endif %}">
                         <i class="bi bi-truck"></i> Veículos
                     </a>
                 </li>
