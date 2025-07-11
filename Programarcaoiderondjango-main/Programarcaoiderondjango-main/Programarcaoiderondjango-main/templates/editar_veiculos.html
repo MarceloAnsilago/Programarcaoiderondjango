@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-center my-4">Editar Veículo</h2>
+{% if erro %}
+  <div class="alert alert-danger">{{ erro }}</div>
+{% endif %}
+<form method="POST" class="row g-3 mt-4" autocomplete="off">
+    {% csrf_token %}
+    <div class="col-md-4">
+        <input name="modelo" class="form-control" placeholder="Modelo" value="{{ veiculo.modelo }}" required>
+    </div>
+    <div class="col-md-4">
+        <input name="placa" class="form-control" placeholder="Placa" value="{{ veiculo.placa }}" required>
+    </div>
+    <div class="col-md-4">
+        <select name="status" class="form-select" required>
+            <option value="Ativo" {% if veiculo.status == "Ativo" %}selected{% endif %}>Ativo</option>
+            <option value="Inativo" {% if veiculo.status == "Inativo" %}selected{% endif %}>Inativo</option>
+        </select>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-success">
+            <i class="bi bi-save"></i> Salvar Alterações
+        </button>
+        <a href="{% url 'pagina_veiculos' %}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

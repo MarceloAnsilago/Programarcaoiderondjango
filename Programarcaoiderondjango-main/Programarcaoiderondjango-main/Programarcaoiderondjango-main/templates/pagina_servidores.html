@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-center my-4">Cadastro de Servidores</h2>
+{% if mensagem %}
+  <div class="alert alert-success">{{ mensagem }}</div>
+{% endif %}
+<form method="POST" class="row g-3 mt-4" autocomplete="off">
+    {% csrf_token %}
+    <div class="col-md-3">
+        <input name="nome" class="form-control" placeholder="Nome" required>
+    </div>
+    <div class="col-md-3">
+        <input name="telefone" class="form-control" placeholder="Telefone" required>
+    </div>
+    <div class="col-md-3">
+        <input name="cargo" class="form-control" placeholder="Cargo" required>
+    </div>
+    <div class="col-md-3">
+        <input name="matricula" class="form-control" placeholder="Matrícula" required>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-person-plus"></i> Cadastrar
+        </button>
+    </div>
+</form>
+
+<hr>
+<h4>Servidores cadastrados:</h4>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>Cargo</th>
+            <th>Matrícula</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in servidores %}
+        <tr>
+            <td>{{ s.nome }}</td>
+            <td>{{ s.telefone }}</td>
+            <td>{{ s.cargo }}</td>
+            <td>{{ s.matricula }}</td>
+            <td>
+                <!-- Excluir -->
+                <form method="post" action="{% url 'excluir_servidor' s.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
+                </form>
+                <!-- Editar -->
+                <a href="{% url 'editar_servidor' s.id %}" class="btn btn-warning btn-sm">Editar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+

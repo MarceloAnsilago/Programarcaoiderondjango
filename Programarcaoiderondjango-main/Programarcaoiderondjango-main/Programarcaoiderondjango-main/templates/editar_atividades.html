@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-center my-4">Editar Atividade</h2>
+{% if erro %}
+  <div class="alert alert-danger">{{ erro }}</div>
+{% endif %}
+<form method="POST" class="row g-3 mt-4" autocomplete="off">
+    {% csrf_token %}
+    <div class="col-md-6">
+        <input name="nome" class="form-control" placeholder="Nome da atividade" value="{{ atividade.nome }}" required>
+    </div>
+    <div class="col-md-3">
+        <select name="classificacao" class="form-select" required>
+            <option value="ANIMAL" {% if atividade.classificacao == 'ANIMAL' %}selected{% endif %}>Animal</option>
+            <option value="VEGETAL" {% if atividade.classificacao == 'VEGETAL' %}selected{% endif %}>Vegetal</option>
+            <option value="APOIO" {% if atividade.classificacao == 'APOIO' %}selected{% endif %}>Apoio</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select name="status" class="form-select" required>
+            <option value="Ativo" {% if atividade.status == 'Ativo' %}selected{% endif %}>Ativo</option>
+            <option value="Inativo" {% if atividade.status == 'Inativo' %}selected{% endif %}>Inativo</option>
+        </select>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-success">
+            <i class="bi bi-save"></i> Salvar Alterações
+        </button>
+        <a href="{% url 'pagina_atividades' %}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

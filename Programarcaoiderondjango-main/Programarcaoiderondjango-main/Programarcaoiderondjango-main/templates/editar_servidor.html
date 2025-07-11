@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-center my-4">Editar Servidor</h2>
+{% if erro %}
+  <div class="alert alert-danger">{{ erro }}</div>
+{% endif %}
+<form method="POST" class="row g-3 mt-4" autocomplete="off">
+    {% csrf_token %}
+    <div class="col-md-3">
+        <input name="nome" class="form-control" placeholder="Nome" value="{{ servidor.nome }}" required>
+    </div>
+    <div class="col-md-3">
+        <input name="telefone" class="form-control" placeholder="Telefone" value="{{ servidor.telefone }}" required>
+    </div>
+    <div class="col-md-3">
+        <input name="cargo" class="form-control" placeholder="Cargo" value="{{ servidor.cargo }}" required>
+    </div>
+    <div class="col-md-3">
+        <input name="matricula" class="form-control" placeholder="Matrícula" value="{{ servidor.matricula }}" required>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-success">
+            <i class="bi bi-save"></i> Salvar Alterações
+        </button>
+        <a href="{% url 'pagina_servidores' %}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

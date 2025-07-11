@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}Programar Atividades{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="bi bi-calendar3"></i> Programação de Atividades</h2>
+    <hr>
+    <!-- ==== FILTROS: MULTI-SELECTS ==== -->
+    <form class="mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="multiServidores" class="form-label">Servidores Ativos</label>
+                <select id="multiServidores" class="form-select" multiple></select>
+            </div>
+            <div class="col-md-4">
+                <label for="multiAtividades" class="form-label">Atividades Ativas</label>
+                <select id="multiAtividades" class="form-select" multiple></select>
+            </div>
+            <div class="col-md-4">
+                <label for="multiVeiculos" class="form-label">Veículos Ativos</label>
+                <select id="multiVeiculos" class="form-select" multiple></select>
+            </div>
+        </div>
+    </form>
+
+    <!-- ==== CALENDÁRIO ==== -->
+    <div id="calendar" class="mt-4"></div>
+</div>
+
+<!-- ==== MODAL BOOTSTRAP PARA PROGRAMAR ATIVIDADE ==== -->
+<div class="modal fade" id="modalProgramarAtividade" tabindex="-1" aria-labelledby="modalProgramarAtividadeLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+
+      <form id="formProgramarAtividade">
+        <div class="modal-header justify-content-center">
+          <div class="w-100 text-center">
+            <h5 class="modal-title fw-bold" id="modalProgramarAtividadeLabel" style="display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-plus-circle me-2 text-primary" style="font-size: 1.7rem;"></i>
+                Programar Atividade para <span id="dataModalLabel" class="ms-2"></span>
+            </h5>
+          </div>
+          <button type="button" class="btn-close position-absolute end-0 me-3" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Select box de atividade no topo -->
+          <div class="mb-4">
+            <div class="input-group justify-content-center" style="max-width: 450px; margin: 0 auto;">
+                <label class="input-group-text" for="atividadeSelect"><i class="bi bi-list-task me-1"></i> Nova atividade</label>
+                <select class="form-select" id="atividadeSelect"></select>
+                <button type="button" class="btn btn-success" id="btnCriarAtividade">
+                    <i class="bi bi-plus-circle"></i> Criar
+                </button>
+            </div>
+          </div>
+          <!-- Atividades dinâmicas, igual cards -->
+          <div class="mb-3">
+            <div class="d-flex flex-row gap-4 justify-content-center" id="cardsContainer"></div>
+          </div>
+          <hr>
+          <div class="mb-3">
+            <h6 class="fw-bold text-secondary text-center"><i class="bi bi-table"></i> Resumo das Alocações</h6>
+            <table class="table table-bordered table-sm" id="tabelaResumo">
+                <thead>
+                  <tr>
+                    <th>Servidor</th>
+                    <th>Atividade</th>
+                    <th>Qtd. Alocações</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+          </div>
+          <input type="hidden" id="dataSelecionada" name="data">
+        </div>
+        <div class="modal-footer justify-content-center">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save2"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- ==== FIM DO MODAL ==== -->
+{% endblock %}
+
+{% block scripts %}
+<!-- ==== SCRIPTS EXTERNOS ==== -->
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<!-- ==== CSS CUSTOM PARA CARDS ==== -->
+<style>
+    .drag-card { background: #f8fafc; border: 1.5px solid #cddaff; border-radius: 10px; min-width: 230px; min-height: 190px; padding: 13px 9px 9px 9px; margin-bottom: 8px; position: relative;}
+    .drag-card h6 { font-size: 16px; text-align: center; font-weight: 700; margin: 0 0 7px 0;}
+    .drag-servidor { background: #6597eeff; color: #fff; border-radius: 7px; margin-bottom: 6px; padding: 7px 10px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; cursor: grab;}
+    .drag-servidor .btn-sm { padding: 0 5px; font-size: 15px; margin-left: 6px;}
+    .drag-card .close { position: absolute; right: 10px; top: 6px; color: #999; font-size: 19px; cursor: pointer;}
+    .drag-card.drag-over { background: #e7ffe7 !important;}
+
+
+
+    .drag-card label {
+        font-size: 15px;
+    }
+    .drag-card select.form-select-sm {
+        min-width: 120px;
+        max-width: 100%;
+    }
+
+
+    .drag-card .mb-2 {
+    margin-top: 120px;  /* ou mais se quiser mais espaço! */
+    }
+</style>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const unidadeId = 1;
+
+    // ========== CHOICES MULTISELECT ==========
+    const choicesServidores = new Choices('#multiServidores', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione os servidores...' });
+    const choicesAtividades = new Choices('#multiAtividades', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione as atividades...' });
+    const choicesVeiculos = new Choices('#multiVeiculos', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione os veículos...' });
+
+    function carregarMultiSelect(endpoint, choicesInstance, labelFn) {
+        fetch(endpoint + '?unidade_id=' + unidadeId)
+            .then(response => response.json())
+            .then(data => {
+                const options = data.map(item => ({
+                    value: item.id,
+                    label: labelFn(item),
+                    selected: true
+                }));
+                choicesInstance.setChoices(options, 'value', 'label', true);
+            });
+    }
+    carregarMultiSelect('/servidores/ativos/', choicesServidores, item => item.nome);
+    carregarMultiSelect('/atividades/ativos/', choicesAtividades, item => item.nome);
+    carregarMultiSelect('/veiculos/ativos/', choicesVeiculos, item => item.placa + ' - ' + item.modelo);
+
+    // ========== FULLCALENDAR ==========
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'pt-br',
+        height: 650,
+        selectable: true,
+        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+        buttonText: { today: 'hoje', month: 'mês' },
+        dateClick: function(info) {
+            document.getElementById('dataSelecionada').value = info.dateStr;
+            document.getElementById('dataModalLabel').innerText = new Date(info.dateStr).toLocaleDateString('pt-BR');
+            prepararModalProgramarAtividade();
+            var modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
+            modal.show();
+        }
+    });
+    calendar.render();
+
+    // ========== MODAL DINÂMICO CARDS ==========
+    function prepararModalProgramarAtividade() {
+        // Atividades disponíveis do filtro
+        const atividadeOptions = choicesAtividades.getValue();
+        const selectAtividade = document.getElementById("atividadeSelect");
+        selectAtividade.innerHTML = '';
+        atividadeOptions.forEach(opt => {
+            let o = document.createElement('option');
+            o.value = opt.value;
+            o.text = opt.label;
+            selectAtividade.appendChild(o);
+        });
+
+        // Container dos cards
+        const cardsDiv = document.getElementById('cardsContainer');
+        cardsDiv.innerHTML = '';
+
+        // Card inicial "Expediente Administrativo"
+        const cardExp = criarCardAtividadeDOM('Expediente Administrativo', 'expediente');
+        cardsDiv.appendChild(cardExp);
+
+        // Adiciona servidores ao card "Expediente"
+        const servidoresSelecionados = choicesServidores.getValue();
+        servidoresSelecionados.forEach(srv => {
+            const servidorDOM = criarServidorDOM(srv.label, srv.value);
+            cardExp.querySelector('.servidores-list').appendChild(servidorDOM);
+        });
+
+        atualizarResumoTabela();
+    }
+
+    // Cria card de atividade com selectbox fixado no rodapé
+    function criarCardAtividadeDOM(titulo, id=null) {
+        const card = document.createElement('div');
+        card.className = 'drag-card';
+        card.setAttribute('ondrop', 'soltar(event)');
+        card.setAttribute('ondragover', 'permitirSoltar(event)');
+        if (id) card.id = id;
+
+        // Botão fechar (exceto "Expediente Administrativo")
+        if (titulo !== 'Expediente Administrativo') {
+            const btnClose = document.createElement('span');
+            btnClose.className = 'close';
+            btnClose.innerHTML = '&times;';
+            btnClose.onclick = () => {
+                const servidores = card.querySelectorAll('.drag-servidor');
+                const expCard = document.getElementById('expediente').querySelector('.servidores-list');
+                servidores.forEach(s => expCard.appendChild(s));
+                card.remove();
+                atualizarResumoTabela();
+            };
+            card.appendChild(btnClose);
+        }
+
+        const h = document.createElement('h6');
+        h.innerText = titulo;
+        card.appendChild(h);
+
+        // LISTA DE SERVIDORES
+        const list = document.createElement('div');
+        list.className = 'servidores-list';
+        card.appendChild(list);
+
+        // SELECTBOX DE VEÍCULOS (no rodapé, se não for Expediente)
+        if (titulo !== 'Expediente Administrativo') {
+            const selectDiv = document.createElement('div');
+            selectDiv.className = "veiculo-div mt-auto";
+            selectDiv.style.width = "100%";
+
+            const selectLabel = document.createElement('label');
+            selectLabel.innerText = "Veículo:";
+            selectLabel.style.fontWeight = "bold";
+            selectLabel.style.display = "block";
+            selectLabel.className = "mb-1";
+
+            const select = document.createElement('select');
+            select.className = "form-select form-select-sm";
+            select.style.width = "100%";
+
+            // Preencher options dos veículos filtrados
+            choicesVeiculos.getValue().forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.value;
+                opt.text = v.label;
+                select.appendChild(opt);
+            });
+
+            selectDiv.appendChild(selectLabel);
+            selectDiv.appendChild(select);
+            card.appendChild(selectDiv);
+        }
+
+        return card;
+    }
+
+    // Criar servidor DOM arrastável
+    function criarServidorDOM(nome, valor) {
+        const div = document.createElement('div');
+        div.className = 'drag-servidor';
+        div.setAttribute('draggable', 'true');
+        div.setAttribute('data-id', valor);
+        div.innerText = nome;
+        div.ondragstart = arrastar;
+        return div;
+    }
+
+    // ========== DRAG AND DROP ==========
+    let draggedItem = null;
+    window.arrastar = function(ev) {
+        draggedItem = ev.target;
+    }
+    window.permitirSoltar = function(ev) {
+        ev.preventDefault();
+        ev.currentTarget.classList.add("drag-over");
+    }
+    window.soltar = function(ev) {
+        ev.preventDefault();
+        if (draggedItem && ev.currentTarget !== draggedItem.parentNode) {
+            // Se não for expediente, adiciona botão de remover
+            if (ev.currentTarget.parentNode && ev.currentTarget.parentNode.id !== "expediente") {
+                if (!draggedItem.querySelector('.btn-sm')) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-sm btn-danger ms-2';
+                    btn.innerHTML = '<i class="bi bi-x"></i>';
+                    btn.onclick = function(e) {
+                        document.getElementById("expediente").querySelector('.servidores-list').appendChild(draggedItem);
+                        btn.remove();
+                        atualizarResumoTabela();
+                        e.stopPropagation();
+                    };
+                    draggedItem.appendChild(btn);
+                }
+            } else {
+                draggedItem.querySelector('.btn-sm')?.remove();
+            }
+            ev.currentTarget.querySelector('.servidores-list').appendChild(draggedItem);
+            atualizarResumoTabela();
+        }
+        ev.currentTarget.classList.remove("drag-over");
+    }
+
+    // Criar novo card ao clicar em "Criar"
+    document.getElementById('btnCriarAtividade').onclick = function() {
+        const atividadeSel = document.getElementById('atividadeSelect');
+        const nomeAtividade = atividadeSel.options[atividadeSel.selectedIndex]?.text;
+        if (!nomeAtividade) return alert('Selecione a atividade!');
+        const existe = Array.from(document.querySelectorAll('.drag-card h6')).some(el => el.innerText == nomeAtividade);
+        if (existe) return alert('Já existe um card para esta atividade.');
+        document.getElementById('cardsContainer').appendChild(criarCardAtividadeDOM(nomeAtividade));
+    };
+
+    // ========== ATUALIZA TABELA RESUMO ==========
+    function atualizarResumoTabela() {
+        const resumo = {};
+        document.querySelectorAll(".drag-card").forEach(card => {
+            const atividade = card.querySelector("h6").innerText;
+            card.querySelectorAll(".drag-servidor").forEach(s => {
+                const nome = s.childNodes[0].textContent.trim();
+                if (!resumo[nome]) resumo[nome] = {};
+                resumo[nome][atividade] = (resumo[nome][atividade] || 0) + 1;
+            });
+        });
+        const tbody = document.querySelector("#tabelaResumo tbody");
+        tbody.innerHTML = "";
+        Object.keys(resumo).forEach(nome => {
+            Object.entries(resumo[nome]).forEach(([atividade, qtd]) => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${nome}</td><td>${atividade}</td><td>${qtd}</td>`;
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    // Salvar programação (submit do modal)
+   
+    document.getElementById('formProgramarAtividade').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const dataSelecionada = document.getElementById('dataSelecionada').value;
+        const programacoes = [];
+
+        document.querySelectorAll('.drag-card').forEach(card => {
+            const atividadeNome = card.querySelector('h6').innerText;
+            let atividadeId = null;
+            let veiculoId = null;
+            // Pegando o id da atividade
+            document.querySelectorAll('#atividadeSelect option').forEach(opt => {
+                if (opt.text === atividadeNome) {
+                    atividadeId = opt.value;
+                }
+            });
+            if (atividadeNome !== 'Expediente Administrativo') {
+                const selectVeiculo = card.querySelector('select');
+                veiculoId = selectVeiculo ? selectVeiculo.value : null;
+            }
+            // IDs dos servidores
+            const servidores = Array.from(card.querySelectorAll('.drag-servidor')).map(srv => srv.getAttribute('data-id'));
+            programacoes.push({
+                atividade_id: atividadeId,
+                veiculo_id: veiculoId,
+                servidores: servidores
+            });
+        });
+
+        // Envio AJAX para backend
+        const resp = await fetch('/programacao/api/salvar/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                data: dataSelecionada,
+                programacoes: programacoes
+            })
+        });
+
+        if (resp.ok) {
+            alert('Programação salva com sucesso!');
+            var modal = bootstrap.Modal.getInstance(document.getElementById('modalProgramarAtividade'));
+            modal.hide();
+            // TODO: atualizar calendário após salvar!
+        } else {
+            alert('Erro ao salvar programação!');
+        }
+    });
+    });
+</script>
+
+{% endblock %}
