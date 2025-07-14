@@ -26,13 +26,15 @@
 
     <!-- ==== CALENDÁRIO ==== -->
     <div id="calendar" class="mt-4"></div>
+
+    <!-- ==== LEGENDA PROGRAMADO ==== -->
+
 </div>
 
 <!-- ==== MODAL BOOTSTRAP PARA PROGRAMAR ATIVIDADE ==== -->
 <div class="modal fade" id="modalProgramarAtividade" tabindex="-1" aria-labelledby="modalProgramarAtividadeLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
-
       <form id="formProgramarAtividade">
         <div class="modal-header justify-content-center">
           <div class="w-100 text-center">
@@ -97,7 +99,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
-<!-- ==== CSS CUSTOM PARA CARDS ==== -->
+<!-- ==== CSS CUSTOM PARA CARDS E BADGE PROGRAMADO ==== -->
 <style>
     .drag-card { background: #f8fafc; border: 1.5px solid #cddaff; border-radius: 10px; min-width: 230px; min-height: 190px; padding: 13px 9px 9px 9px; margin-bottom: 8px; position: relative;}
     .drag-card h6 { font-size: 16px; text-align: center; font-weight: 700; margin: 0 0 7px 0;}
@@ -106,22 +108,22 @@
     .drag-card .close { position: absolute; right: 10px; top: 6px; color: #999; font-size: 19px; cursor: pointer;}
     .drag-card.drag-over { background: #e7ffe7 !important;}
 
-
-
-    .drag-card label {
-        font-size: 15px;
-    }
-    .drag-card select.form-select-sm {
-        min-width: 120px;
-        max-width: 100%;
-    }
-
-
-    .drag-card .mb-2 {
-    margin-top: 120px;  /* ou mais se quiser mais espaço! */
+    /* BADGE Programado no calendário */
+    .fc-daygrid-event.fc-event.fc-badge-programado {
+        background: #516b09 !important;
+        color: #ffffff !important;
+        font-weight: bold;
+        border-radius: 10px !important;
+        padding: 2px 12px !important;
+        border: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95em;
+        box-shadow: 0 1px 3px #0001;
+        margin: 2px auto !important;
     }
 </style>
-
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
@@ -148,28 +150,81 @@ document.addEventListener("DOMContentLoaded", function() {
     carregarMultiSelect('/atividades/ativos/', choicesAtividades, item => item.nome);
     carregarMultiSelect('/veiculos/ativos/', choicesVeiculos, item => item.placa + ' - ' + item.modelo);
 
-    // ========== FULLCALENDAR ==========
-    var calendarEl = document.getElementById('calendar');
-    var calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        locale: 'pt-br',
-        height: 650,
-        selectable: true,
-        headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
-        buttonText: { today: 'hoje', month: 'mês' },
-        dateClick: function(info) {
-            document.getElementById('dataSelecionada').value = info.dateStr;
-            document.getElementById('dataModalLabel').innerText = new Date(info.dateStr).toLocaleDateString('pt-BR');
-            prepararModalProgramarAtividade();
-            var modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
-            modal.show();
-        }
-    });
-    calendar.render();
+    // ======== CARREGAR DATAS JÁ PROGRAMADAS NO CALENDÁRIO =========
+    let datasProgramadasEventos = [];
 
-    // ========== MODAL DINÂMICO CARDS ==========
-    function prepararModalProgramarAtividade() {
-        // Atividades disponíveis do filtro
+    function carregarDatasProgramadas() {
+        return fetch('/programacao/datas_programadas/?unidade_id=1')
+            .then(response => response.json())
+            .then(datas => {
+                // Cada data vira um "badge" (não fundo!)
+                datasProgramadasEventos = datas.map(d => ({
+                    title: "Programado",
+                    start: d,
+                    allDay: true,
+                    display: 'list-item',       // 'badge' style
+                    color: '#09366b',           // azul escuro badge
+                    textColor: '#fff',
+                    classNames: ['fc-badge-programado']
+                }));
+            });
+    }
+
+    // ========== FULLCALENDAR ==========
+    carregarDatasProgramadas().then(function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'pt-br',
+            height: 650,
+            selectable: true,
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+            buttonText: { today: 'hoje', month: 'mês' },
+            events: datasProgramadasEventos, // <- Adiciona eventos de datas programadas!
+     
+            dateClick: function(info) {
+                const dataClicada = info.dateStr;
+                document.getElementById('dataSelecionada').value = dataClicada;
+                document.getElementById('dataModalLabel').innerText = new Date(dataClicada).toLocaleDateString('pt-BR');
+                
+                // Busca detalhes da programação desse dia
+                fetch(`/programacao/detalhe/?data=${dataClicada}&unidade_id=${unidadeId}`)
+                    .then(r => r.json())
+                    .then(json => {
+                        // Envia as alocações retornadas para o modal (pode ser vazio)
+                        prepararModalProgramarAtividade(json.alocacoes);
+                        var modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
+                        modal.show();
+                    });
+            },
+        });
+        calendar.render();
+    });
+
+// ========== MODAL DINÂMICO CARDS ==========
+
+function prepararModalProgramarAtividade(alocacoes = []) {
+    const cardsDiv = document.getElementById('cardsContainer');
+    cardsDiv.innerHTML = '';
+
+    if (alocacoes.length > 0) {
+        // CARREGA OS CARDS DO BANCO
+        alocacoes.forEach(cardData => {
+            const card = criarCardAtividadeDOM(cardData.atividade_nome, cardData.atividade_id);
+            // Veículo (seta valor no select se existir)
+            if (cardData.veiculo_id) {
+                let select = card.querySelector('select[data-select-veiculo]');
+                if (select) select.value = cardData.veiculo_id.toString();
+            }
+            // Servidores
+            const list = card.querySelector('.servidores-list');
+            cardData.servidores.forEach(srv => {
+                list.appendChild(criarServidorDOM(srv.nome, srv.id));
+            });
+            cardsDiv.appendChild(card);
+        });
+    } else {
+        // SEM programação: inicia do zero
         const atividadeOptions = choicesAtividades.getValue();
         const selectAtividade = document.getElementById("atividadeSelect");
         selectAtividade.innerHTML = '';
@@ -179,100 +234,95 @@ document.addEventListener("DOMContentLoaded", function() {
             o.text = opt.label;
             selectAtividade.appendChild(o);
         });
-
-        // Container dos cards
-        const cardsDiv = document.getElementById('cardsContainer');
-        cardsDiv.innerHTML = '';
-
-        // Card inicial "Expediente Administrativo"
-        const cardExp = criarCardAtividadeDOM('Expediente Administrativo', 'expediente');
+        // Card Expediente padrão
+        const cardExp = criarCardAtividadeDOM('Expediente Administrativo', null);
+        cardExp.id = "expediente";
         cardsDiv.appendChild(cardExp);
-
-        // Adiciona servidores ao card "Expediente"
+        // Servidores
         const servidoresSelecionados = choicesServidores.getValue();
         servidoresSelecionados.forEach(srv => {
             const servidorDOM = criarServidorDOM(srv.label, srv.value);
             cardExp.querySelector('.servidores-list').appendChild(servidorDOM);
         });
-
-        atualizarResumoTabela();
     }
 
-    // Cria card de atividade com selectbox fixado no rodapé
-    function criarCardAtividadeDOM(titulo, id=null) {
-        const card = document.createElement('div');
-        card.className = 'drag-card';
-        card.setAttribute('ondrop', 'soltar(event)');
-        card.setAttribute('ondragover', 'permitirSoltar(event)');
-        if (id) card.id = id;
+    atualizarResumoTabela();
+}
 
-        // Botão fechar (exceto "Expediente Administrativo")
-        if (titulo !== 'Expediente Administrativo') {
-            const btnClose = document.createElement('span');
-            btnClose.className = 'close';
-            btnClose.innerHTML = '&times;';
-            btnClose.onclick = () => {
-                const servidores = card.querySelectorAll('.drag-servidor');
-                const expCard = document.getElementById('expediente').querySelector('.servidores-list');
-                servidores.forEach(s => expCard.appendChild(s));
-                card.remove();
-                atualizarResumoTabela();
-            };
-            card.appendChild(btnClose);
-        }
+// Criar card de atividade (DOM)
+function criarCardAtividadeDOM(titulo, atividadeId = null) {
+    const card = document.createElement('div');
+    card.className = 'drag-card';
+    card.setAttribute('ondrop', 'soltar(event)');
+    card.setAttribute('ondragover', 'permitirSoltar(event)');
+    if (atividadeId) card.setAttribute('data-id', atividadeId);
 
-        const h = document.createElement('h6');
-        h.innerText = titulo;
-        card.appendChild(h);
-
-        // LISTA DE SERVIDORES
-        const list = document.createElement('div');
-        list.className = 'servidores-list';
-        card.appendChild(list);
-
-        // SELECTBOX DE VEÍCULOS (no rodapé, se não for Expediente)
-        if (titulo !== 'Expediente Administrativo') {
-            const selectDiv = document.createElement('div');
-            selectDiv.className = "veiculo-div mt-auto";
-            selectDiv.style.width = "100%";
-
-            const selectLabel = document.createElement('label');
-            selectLabel.innerText = "Veículo:";
-            selectLabel.style.fontWeight = "bold";
-            selectLabel.style.display = "block";
-            selectLabel.className = "mb-1";
-
-            const select = document.createElement('select');
-            select.className = "form-select form-select-sm";
-            select.style.width = "100%";
-
-            // Preencher options dos veículos filtrados
-            choicesVeiculos.getValue().forEach(v => {
-                const opt = document.createElement('option');
-                opt.value = v.value;
-                opt.text = v.label;
-                select.appendChild(opt);
-            });
-
-            selectDiv.appendChild(selectLabel);
-            selectDiv.appendChild(select);
-            card.appendChild(selectDiv);
-        }
-
-        return card;
+    // Botão fechar (exceto "expediente")
+    if (titulo !== 'Expediente Administrativo') {
+        const btnClose = document.createElement('span');
+        btnClose.className = 'close';
+        btnClose.innerHTML = '&times;';
+        btnClose.onclick = () => {
+            const servidores = card.querySelectorAll('.drag-servidor');
+            const expCard = document.getElementById('expediente').querySelector('.servidores-list');
+            servidores.forEach(s => expCard.appendChild(s));
+            card.remove();
+            atualizarResumoTabela();
+        };
+        card.appendChild(btnClose);
     }
 
-    // Criar servidor DOM arrastável
-    function criarServidorDOM(nome, valor) {
-        const div = document.createElement('div');
-        div.className = 'drag-servidor';
-        div.setAttribute('draggable', 'true');
-        div.setAttribute('data-id', valor);
-        div.innerText = nome;
-        div.ondragstart = arrastar;
-        return div;
+    const h = document.createElement('h6');
+    h.innerText = titulo;
+    card.appendChild(h);
+
+    const list = document.createElement('div');
+    list.className = 'servidores-list';
+    card.appendChild(list);
+
+    // ===== SELECTBOX DE VEÍCULO (exceto expediente)
+    if (titulo !== 'Expediente Administrativo') {
+        const selectDiv = document.createElement('div');
+        selectDiv.className = "veiculo-div mt-auto";
+        selectDiv.style.width = "100%";
+
+        const selectLabel = document.createElement('label');
+        selectLabel.innerText = "Veículo:";
+        selectLabel.style.fontWeight = "bold";
+        selectLabel.style.display = "block";
+        selectLabel.className = "mb-1";
+
+        const select = document.createElement('select');
+        select.className = "form-select form-select-sm";
+        select.style.width = "100%";
+        select.setAttribute('data-select-veiculo', '');
+
+        // Popula os veículos atuais do filtro
+        choicesVeiculos.getValue().forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.value;
+            opt.text = v.label;
+            select.appendChild(opt);
+        });
+
+        selectDiv.appendChild(selectLabel);
+        selectDiv.appendChild(select);
+        card.appendChild(selectDiv);
     }
 
+    return card;
+}
+
+// Criar servidor DOM arrastável
+function criarServidorDOM(nome, valor) {
+    const div = document.createElement('div');
+    div.className = 'drag-servidor';
+    div.setAttribute('draggable', 'true');
+    div.setAttribute('data-id', valor);
+    div.innerText = nome;
+    div.ondragstart = arrastar;
+    return div;
+}
     // ========== DRAG AND DROP ==========
     let draggedItem = null;
     window.arrastar = function(ev) {
@@ -312,10 +362,11 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById('btnCriarAtividade').onclick = function() {
         const atividadeSel = document.getElementById('atividadeSelect');
         const nomeAtividade = atividadeSel.options[atividadeSel.selectedIndex]?.text;
+        const atividadeId = atividadeSel.value;
         if (!nomeAtividade) return alert('Selecione a atividade!');
         const existe = Array.from(document.querySelectorAll('.drag-card h6')).some(el => el.innerText == nomeAtividade);
         if (existe) return alert('Já existe um card para esta atividade.');
-        document.getElementById('cardsContainer').appendChild(criarCardAtividadeDOM(nomeAtividade));
+        document.getElementById('cardsContainer').appendChild(criarCardAtividadeDOM(nomeAtividade, atividadeId));
     };
 
     // ========== ATUALIZA TABELA RESUMO ==========
@@ -341,55 +392,59 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // Salvar programação (submit do modal)
-   
-    document.getElementById('formProgramarAtividade').addEventListener('submit', async function(event) {
+    document.getElementById('formProgramarAtividade').addEventListener('submit', function(event) {
         event.preventDefault();
-        const dataSelecionada = document.getElementById('dataSelecionada').value;
-        const programacoes = [];
-
+        const alocacoes = [];
         document.querySelectorAll('.drag-card').forEach(card => {
-            const atividadeNome = card.querySelector('h6').innerText;
-            let atividadeId = null;
-            let veiculoId = null;
-            // Pegando o id da atividade
-            document.querySelectorAll('#atividadeSelect option').forEach(opt => {
-                if (opt.text === atividadeNome) {
-                    atividadeId = opt.value;
+            const atividade_nome = card.querySelector('h6').innerText;
+            const atividade_id = card.getAttribute('data-id');
+
+            // Só pega veículo se não for expediente administrativo
+            let veiculo_id = null;
+            if (atividade_nome !== 'Expediente Administrativo') {
+                const selectVeiculo = card.querySelector('select[data-select-veiculo]');
+                if (selectVeiculo) {
+                    veiculo_id = selectVeiculo.value || null;
+                }
+            }
+
+            card.querySelectorAll('.drag-servidor').forEach(srv => {
+                if (atividade_id) {
+                    alocacoes.push({
+                        servidor_id: srv.getAttribute('data-id'),
+                        atividade_id: atividade_id,
+                        veiculo_id: veiculo_id,
+                        atividade_nome: atividade_nome
+                    });
                 }
             });
-            if (atividadeNome !== 'Expediente Administrativo') {
-                const selectVeiculo = card.querySelector('select');
-                veiculoId = selectVeiculo ? selectVeiculo.value : null;
-            }
-            // IDs dos servidores
-            const servidores = Array.from(card.querySelectorAll('.drag-servidor')).map(srv => srv.getAttribute('data-id'));
-            programacoes.push({
-                atividade_id: atividadeId,
-                veiculo_id: veiculoId,
-                servidores: servidores
-            });
         });
+        const dataSelecionada = document.getElementById('dataSelecionada').value;
 
-        // Envio AJAX para backend
-        const resp = await fetch('/programacao/api/salvar/', {
+        fetch('/programacao/salvar_programacao/', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
                 data: dataSelecionada,
-                programacoes: programacoes
+                unidade_id: unidadeId,
+                alocacoes: alocacoes
             })
-        });
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'ok'){
+                alert('Programação salva com sucesso!');
+            }else{
+                alert('Erro: ' + data.msg);
+            }
+        })
+        .catch(error => alert('Erro ao salvar programação!'));
 
-        if (resp.ok) {
-            alert('Programação salva com sucesso!');
-            var modal = bootstrap.Modal.getInstance(document.getElementById('modalProgramarAtividade'));
-            modal.hide();
-            // TODO: atualizar calendário após salvar!
-        } else {
-            alert('Erro ao salvar programação!');
-        }
+        var modal = bootstrap.Modal.getInstance(document.getElementById('modalProgramarAtividade'));
+        modal.hide();
     });
-    });
+});
 </script>
-
 {% endblock %}
