@@ -57,9 +57,10 @@
             </div>
           </div>
           <!-- Atividades dinâmicas, igual cards -->
-          <div class="mb-3">
-            <div class="d-flex flex-row gap-4 justify-content-center" id="cardsContainer"></div>
-          </div>
+            <!-- WRAPPER para rolagem horizontal -->
+            <div style="overflow-x: auto; white-space: nowrap; padding-bottom: 7px;">
+            <div class="d-inline-flex flex-row gap-4" id="cardsContainer" style="white-space: normal;"></div>
+            </div>
           <hr>
           <div class="mb-3">
             <h6 class="fw-bold text-secondary text-center"><i class="bi bi-table"></i> Resumo das Alocações</h6>
@@ -134,6 +135,36 @@ document.addEventListener("DOMContentLoaded", function() {
     const choicesAtividades = new Choices('#multiAtividades', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione as atividades...' });
     const choicesVeiculos = new Choices('#multiVeiculos', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione os veículos...' });
 
+    function aguardarTodosChoicesProntos() {
+        const esperados = ['multiServidores', 'multiAtividades', 'multiVeiculos'];
+        // Checa se todos os selects já estão prontos ANTES de escutar o evento
+        const todosProntos = esperados.every(id => {
+            const el = document.getElementById(id);
+            // .options.length > 0 só é true se já carregou!
+            return el && el.options && el.options.length > 0;
+        });
+
+        if (todosProntos) {
+            // Já carregou, não precisa aguardar nada
+            return Promise.resolve();
+        }
+
+        // Senão, aguarda os 3 events no futuro (em qualquer ordem)
+        return new Promise((resolve) => {
+            const recebidos = new Set();
+
+            function listener(e) {
+                recebidos.add(e.detail.name);
+                if (esperados.every(name => recebidos.has(name))) {
+                    document.removeEventListener('choicesReady', listener);
+                    resolve();
+                }
+            }
+            document.addEventListener('choicesReady', listener);
+        });
+    }
+
+
     function carregarMultiSelect(endpoint, choicesInstance, labelFn) {
         fetch(endpoint + '?unidade_id=' + unidadeId)
             .then(response => response.json())
@@ -144,11 +175,15 @@ document.addEventListener("DOMContentLoaded", function() {
                     selected: true
                 }));
                 choicesInstance.setChoices(options, 'value', 'label', true);
+                options.forEach(opt => choicesInstance.setChoiceByValue(opt.value.toString()));
+                document.dispatchEvent(new CustomEvent('choicesReady', { detail: { name: choicesInstance.containerOuter.element.id } }));
             });
     }
+
     carregarMultiSelect('/servidores/ativos/', choicesServidores, item => item.nome);
     carregarMultiSelect('/atividades/ativos/', choicesAtividades, item => item.nome);
     carregarMultiSelect('/veiculos/ativos/', choicesVeiculos, item => item.placa + ' - ' + item.modelo);
+
 
     // ======== CARREGAR DATAS JÁ PROGRAMADAS NO CALENDÁRIO =========
     let datasProgramadasEventos = [];
@@ -171,6 +206,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // ========== FULLCALENDAR ==========
+   
     carregarDatasProgramadas().then(function() {
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
@@ -180,65 +216,75 @@ document.addEventListener("DOMContentLoaded", function() {
             selectable: true,
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
             buttonText: { today: 'hoje', month: 'mês' },
-            events: datasProgramadasEventos, // <- Adiciona eventos de datas programadas!
-     
+            events: datasProgramadasEventos,
+
+         
             dateClick: function(info) {
                 const dataClicada = info.dateStr;
                 document.getElementById('dataSelecionada').value = dataClicada;
-                document.getElementById('dataModalLabel').innerText = new Date(dataClicada).toLocaleDateString('pt-BR');
-                
-                // Busca detalhes da programação desse dia
-                fetch(`/programacao/detalhe/?data=${dataClicada}&unidade_id=${unidadeId}`)
-                    .then(r => r.json())
-                    .then(json => {
-                        // Envia as alocações retornadas para o modal (pode ser vazio)
-                        prepararModalProgramarAtividade(json.alocacoes);
-                        var modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
-                        modal.show();
-                    });
-            },
+                const [ano, mes, dia] = dataClicada.split('-');
+                document.getElementById('dataModalLabel').innerText = `${dia}/${mes}/${ano}`;
+
+                aguardarTodosChoicesProntos().then(() => {
+                    // Aqui faz o GET para o backend buscar as alocações do dia!
+                    fetch(`/programacao/detalhe/?data=${dataClicada}&unidade_id=${unidadeId}`)
+                        .then(r => r.json())
+                        .then(json => {
+                            console.log('Alocações recebidas do backend:', json.alocacoes);
+                            prepararModalProgramarAtividade(json.alocacoes);
+                            var modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
+                            modal.show();
+                        });
+                });
+            }
         });
         calendar.render();
     });
-
 // ========== MODAL DINÂMICO CARDS ==========
 
 function prepararModalProgramarAtividade(alocacoes = []) {
     const cardsDiv = document.getElementById('cardsContainer');
     cardsDiv.innerHTML = '';
 
-    if (alocacoes.length > 0) {
-        // CARREGA OS CARDS DO BANCO
-        alocacoes.forEach(cardData => {
-            const card = criarCardAtividadeDOM(cardData.atividade_nome, cardData.atividade_id);
-            // Veículo (seta valor no select se existir)
-            if (cardData.veiculo_id) {
-                let select = card.querySelector('select[data-select-veiculo]');
-                if (select) select.value = cardData.veiculo_id.toString();
-            }
-            // Servidores
-            const list = card.querySelector('.servidores-list');
-            cardData.servidores.forEach(srv => {
-                list.appendChild(criarServidorDOM(srv.nome, srv.id));
-            });
-            cardsDiv.appendChild(card);
-        });
-    } else {
-        // SEM programação: inicia do zero
-        const atividadeOptions = choicesAtividades.getValue();
-        const selectAtividade = document.getElementById("atividadeSelect");
-        selectAtividade.innerHTML = '';
-        atividadeOptions.forEach(opt => {
-            let o = document.createElement('option');
-            o.value = opt.value;
-            o.text = opt.label;
-            selectAtividade.appendChild(o);
-        });
-        // Card Expediente padrão
-        const cardExp = criarCardAtividadeDOM('Expediente Administrativo', null);
-        cardExp.id = "expediente";
-        cardsDiv.appendChild(cardExp);
+    // Sempre monta o select SEM "Expediente Administrativo"
+    const atividadeOptions = choicesAtividades.getValue()
+        .filter(opt => opt.label.toLowerCase() !== "expediente administrativo");
+    const selectAtividade = document.getElementById("atividadeSelect");
+    selectAtividade.innerHTML = '';
+    atividadeOptions.forEach(opt => {
+        let o = document.createElement('option');
+        o.value = opt.value;
+        o.text = opt.label;
+        selectAtividade.appendChild(o);
+    });
+
+    // SEMPRE monta os cards que vêm do backend!
+    alocacoes.forEach(cardData => {
+        const card = criarCardAtividadeDOM(cardData.atividade_nome, cardData.atividade_id);
+        // Veículo (seta valor no select se existir)
+        if (cardData.veiculo_id) {
+            let select = card.querySelector('select[data-select-veiculo]');
+            if (select) select.value = cardData.veiculo_id.toString();
+        }
         // Servidores
+        const list = card.querySelector('.servidores-list');
+        cardData.servidores.forEach(srv => {
+            list.appendChild(criarServidorDOM(srv.nome, srv.id));
+        });
+        if (cardData.atividade_nome?.toLowerCase() === "expediente administrativo") {
+            card.id = "expediente";
+        }
+        cardsDiv.appendChild(card);
+    });
+
+    // **CASO ESPECIAL:** se vier Expediente vazio E o usuário está em modo de criar do zero (nenhuma programação no banco)
+    if (
+        alocacoes.length === 1 &&
+        alocacoes[0].atividade_nome?.toLowerCase() === "expediente administrativo" &&
+        alocacoes[0].servidores.length === 0
+    ) {
+        // Mostra no card os servidores filtrados no Choices.js!
+        const cardExp = document.getElementById('expediente');
         const servidoresSelecionados = choicesServidores.getValue();
         servidoresSelecionados.forEach(srv => {
             const servidorDOM = criarServidorDOM(srv.label, srv.value);
@@ -248,7 +294,6 @@ function prepararModalProgramarAtividade(alocacoes = []) {
 
     atualizarResumoTabela();
 }
-
 // Criar card de atividade (DOM)
 function criarCardAtividadeDOM(titulo, atividadeId = null) {
     const card = document.createElement('div');

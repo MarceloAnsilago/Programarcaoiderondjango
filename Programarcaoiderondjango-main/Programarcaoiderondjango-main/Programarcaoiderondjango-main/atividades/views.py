@@ -19,6 +19,33 @@ def pagina_atividades(request):
             "status": status,
             "unidade_id": unidade_id
         }
+
+        # >>>>>>>>>>>>>>>> NOVO BLOCO <<<<<<<<<<<<<<<<<<<
+        # Antes de salvar a atividade, garante que Expediente já existe!
+        try:
+            expediente = (
+                supabase.table("atividades")
+                .select("*")
+                .eq("nome", "Expediente Administrativo")
+                .eq("unidade_id", unidade_id)
+                .single()
+                .execute()
+            )
+        except Exception:
+            expediente = None  # Não existe ainda
+
+        if not expediente or not expediente.data:
+            try:
+                supabase.table("atividades").insert({
+                    "nome": "Expediente Administrativo",
+                    "classificacao": "Padrão",
+                    "status": "Ativo",
+                    "unidade_id": unidade_id
+                }).execute()
+            except Exception as e:
+                print("Erro ao criar atividade padrão:", e)
+        # <<<<<<<<<<<<<< FIM DO NOVO BLOCO <<<<<<<<<<<<<<<<
+
         try:
             supabase.table("atividades").insert(data).execute()
             mensagem = "Atividade cadastrada com sucesso!"
@@ -27,6 +54,7 @@ def pagina_atividades(request):
     # Sempre buscar as atividades para exibir na página
     atividades = supabase.table("atividades").select("*").execute().data
     return render(request, "pagina_atividades.html", {"mensagem": mensagem, "atividades": atividades})
+
 
 def excluir_atividade(request, id):
     if request.method == "POST":

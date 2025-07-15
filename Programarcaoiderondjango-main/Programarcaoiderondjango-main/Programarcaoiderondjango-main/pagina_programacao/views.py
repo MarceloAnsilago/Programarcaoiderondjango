@@ -4,13 +4,12 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from supabase import create_client
 
-
-def pagina_programacao(request):
-    return render(request, 'pagina_programacao.html')
-
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def pagina_programacao(request):
+    return render(request, 'pagina_programacao.html')
 
 @csrf_exempt
 def salvar_programacao(request):
@@ -72,9 +71,8 @@ def datas_programadas(request):
     return JsonResponse(datas, safe=False)
 
 
-
+@csrf_exempt
 def detalhe_programacao(request):
-    import json
     if request.method == "GET":
         data = request.GET.get('data')
         unidade_id = request.GET.get('unidade_id', 1)
@@ -88,18 +86,16 @@ def detalhe_programacao(request):
             .execute()
             .data
         )
-        
+        print('ALOCAÇÕES:', alocacoes) 
         # Organiza por atividade/card
         cards = {}
         for aloc in alocacoes:
             aid = aloc["atividade_id"]
             v_id = aloc.get("veiculo_id")
-            # Nome dos relacionamentos:
             atividade_nome = (aloc.get("atividade") or {}).get("nome", "Expediente Administrativo") if aid else "Expediente Administrativo"
             veiculo_nome = None
             if v_id and aloc.get("veiculo"):
                 veiculo_nome = f"{aloc['veiculo']['placa']} - {aloc['veiculo']['modelo']}"
-
             card_key = f"{aid}_{v_id or ''}"
             if card_key not in cards:
                 cards[card_key] = {
@@ -113,6 +109,32 @@ def detalhe_programacao(request):
                 "id": aloc["servidor_id"],
                 "nome": (aloc.get("servidor") or {}).get("nome", "")
             })
+
+
+        # >>>>>> ADICIONA O EXPEDIENTE SE NÃO EXISTE <<<<<<
+        expediente = (
+            supabase.table("atividades")
+            .select("id")
+            .eq("nome", "Expediente Administrativo")
+            .eq("unidade_id", unidade_id)
+            .single()
+            .execute()
+        )
+        expediente_id = expediente.data["id"] if expediente and expediente.data else None
+
+        # Só adiciona se ainda não veio em nenhum card do dia:
+        ja_tem_expediente = any(
+            str(card.get("atividade_id")) == str(expediente_id) for card in cards.values()
+        )
+        if expediente_id and not ja_tem_expediente:
+            cards[f"{expediente_id}_"] = {
+                "atividade_id": expediente_id,
+                "atividade_nome": "Expediente Administrativo",
+                "veiculo_id": None,
+                "veiculo_nome": None,
+                "servidores": [],
+            }
+
 
         return JsonResponse({"alocacoes": list(cards.values())})
     return JsonResponse({"erro": "Método não permitido"}, status=405)
