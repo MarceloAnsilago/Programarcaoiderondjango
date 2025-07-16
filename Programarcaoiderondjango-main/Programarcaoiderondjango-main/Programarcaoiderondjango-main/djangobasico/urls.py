@@ -15,15 +15,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path,include
+from django.urls import path, include
 from django.shortcuts import redirect
-from atividades import views as atividades_views 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('servidores/', include('servidores.urls')),
     path('atividades/', include('atividades.urls')),
     path('veiculos/', include('veiculos.urls')),
-    path('programacao/', include('pagina_programacao.urls')), 
-    path('', lambda request: redirect('/servidores/')),  # <-- Redireciona / para /servidores/
+    path('programacao/', include('pagina_programacao.urls')),
+
+    path('', lambda request: redirect('/servidores/')),
 ]
