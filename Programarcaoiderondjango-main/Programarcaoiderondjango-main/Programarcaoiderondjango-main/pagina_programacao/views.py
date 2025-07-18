@@ -290,7 +290,120 @@ def api_relatorio_semanal(request):
 
         return JsonResponse({"servidores": servidores})
 
+@csrf_exempt
+def api_programacao_mes(request):
+    if request.method == "GET":
+        unidade_id = int(request.GET.get('unidade_id', 1))
+        ano = int(request.GET.get('ano', date.today().year))
+        mes = int(request.GET.get('mes', date.today().month))
 
+        # Pega o primeiro e último dia do mês
+        from calendar import monthrange
+        dia_inicio = date(ano, mes, 1)
+        dia_fim = date(ano, mes, monthrange(ano, mes)[1])
+
+        # 1. Busca programações do mês inteiro
+        programacoes = supabase.table("programacoes")\
+            .select("*, atividade:atividade_id(nome), veiculo:veiculo_id(placa,modelo)")\
+            .eq("unidade_id", unidade_id)\
+            .gte("data", dia_inicio.isoformat())\
+            .lte("data", dia_fim.isoformat())\
+            .execute().data
+
+        # 2. Busca alocações do mês inteiro
+        alocacoes = supabase.table("alocacoes")\
+            .select("programacao_id, servidor:servidor_id(nome)")\
+            .eq("unidade_id", unidade_id)\
+            .gte("data", dia_inicio.isoformat())\
+            .lte("data", dia_fim.isoformat())\
+            .execute().data
+
+        # 3. Indexa servidores por programação
+        servidores_por_programacao = defaultdict(list)
+        for aloc in alocacoes:
+            if aloc.get("programacao_id") and aloc.get("servidor", {}).get("nome"):
+                servidores_por_programacao[aloc["programacao_id"]].append(aloc["servidor"]["nome"])
+
+        # 4. AGRUPA POR DATA e monta output
+        result = defaultdict(list)
+        for p in programacoes:
+            data_str = p["data"]
+            prog_id = p["id"]
+            atividade_nome = p.get("atividade", {}).get("nome", p.get("atividade_id", ""))
+            veiculo_nome = ""
+            if p.get("veiculo"):
+                veiculo_nome = f"{p['veiculo'].get('placa','')}"
+                if p['veiculo'].get('modelo'):
+                    veiculo_nome += " - " + p['veiculo']['modelo']
+            result[data_str].append({
+                "atividade": atividade_nome,
+                "servidores": servidores_por_programacao.get(prog_id, []),
+                "veiculo": veiculo_nome,
+                "descricao": p.get("descricao", "")
+            })
+        return JsonResponse({"programacoes": result})
+    return JsonResponse({"erro": "Método não permitido"}, status=405)
+
+def api_programacao_meses_disponiveis(request):
+    unidade_id = int(request.GET.get('unidade_id', 1))
+    # Busca todas datas de programações
+    rows = supabase.table("programacoes").select("data").eq("unidade_id", unidade_id).execute().data
+
+    meses = set()
+    for row in rows:
+        if 'data' in row and row['data']:
+            # Data sempre YYYY-MM-DD
+            partes = row['data'].split('-')
+            if len(partes) == 3:
+                ano = partes[0]
+                mes = partes[1]
+                meses.add(f"{ano}-{mes}")
+
+    # Deixa ordenado (mais antigo para mais recente)
+    meses_ord = sorted(list(meses))
+    meses_labels = []
+    MES_LABELS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    for m in meses_ord:
+        ano, mes = m.split('-')
+        label = f"{MES_LABELS[int(mes)-1]}/{ano}"
+        meses_labels.append({"mes": m, "label": label})
+
+    return JsonResponse(meses_labels, safe=False)
+@csrf_exempt
+def api_relatorio_mensal(request):
+    if request.method == "GET":
+        unidade_id = int(request.GET.get('unidade_id', 1))
+        ano = int(request.GET.get('ano', date.today().year))
+        mes = int(request.GET.get('mes', date.today().month))
+        from calendar import monthrange
+        dia_inicio = date(ano, mes, 1)
+        dia_fim = date(ano, mes, monthrange(ano, mes)[1])
+
+        # Busca as alocações do mês, exceto Expediente Administrativo
+        alocacoes = supabase.table("alocacoes") \
+            .select("data, atividade:atividade_id(nome), servidor:servidor_id(nome)") \
+            .eq("unidade_id", unidade_id) \
+            .gte("data", dia_inicio.isoformat()) \
+            .lte("data", dia_fim.isoformat()) \
+            .execute().data
+
+        servidores = defaultdict(list)
+        for aloc in alocacoes:
+            atividade_nome = (aloc.get("atividade") or {}).get("nome", "")
+            if atividade_nome.lower().strip() == "expediente administrativo":
+                continue
+            servidor_nome = (aloc.get("servidor") or {}).get("nome", "")
+            if not servidor_nome:
+                continue
+            servidores[servidor_nome].append({
+                "data": aloc.get("data"),
+                "atividade": atividade_nome,
+            })
+
+        return JsonResponse({"servidores": servidores})
+
+    return JsonResponse({"erro": "Método não permitido"}, status=405)
 
 def relatorio_semanal(request):
     # Sua lógica aqui

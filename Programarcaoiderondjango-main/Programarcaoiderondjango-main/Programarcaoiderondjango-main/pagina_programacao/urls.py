@@ -11,5 +11,8 @@ urlpatterns = [
     path('api/relatorio-semanal/', views.api_relatorio_semanal, name='api_relatorio_semanal'),   # <----- ESSA LINHA!!!
     path('relatorio/semanal/', views.relatorio_semanal, name='relatorio_semanal'),
     path('relatorio/mensal/', views.relatorio_mensal, name='relatorio_mensal'),
+    path('api/programacao-mes/', views.api_programacao_mes, name='api_programacao_mes'),
+    path('api/programacao-meses-disponiveis/', views.api_programacao_meses_disponiveis, name='programacao_meses_disponiveis'),
+    path('api/relatorio-mensal/', views.api_relatorio_mensal, name='api_relatorio_mensal'),
 ]
 
