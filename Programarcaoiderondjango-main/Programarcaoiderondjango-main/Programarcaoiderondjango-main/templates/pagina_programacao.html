@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-
+{% load static %}
 {% block title %}Programar Atividades{% endblock %}
-
 {% block content %}
+
 <div class="container mt-4">
     <h2><i class="bi bi-calendar3"></i> Programação de Atividades</h2>
     <hr>
@@ -26,77 +26,7 @@
     <div id="calendar" class="mt-4"></div>
 </div>
 {% include "relatorios.html" %}
-<!-- ==== MODAL ==== -->
-<div class="modal fade" id="modalProgramarAtividade" tabindex="-1" aria-labelledby="modalProgramarAtividadeLabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl">
-    <div class="modal-content">
-      <form id="formProgramarAtividade">
-        <div class="modal-header justify-content-center">
-          <div class="w-100 text-center">
-            <h5 class="modal-title fw-bold" id="modalProgramarAtividadeLabel" style="display: flex; align-items: center; justify-content: center;">
-                <i class="bi bi-plus-circle me-2 text-primary" style="font-size: 1.7rem;"></i>
-                Programar Atividade para <span id="dataModalLabel" class="ms-2"></span>
-            </h5>
-          </div>
-          <button type="button" class="btn-close position-absolute end-0 me-3" data-bs-dismiss="modal" aria-label="Fechar"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-4">
-            <div class="input-group justify-content-center" style="max-width: 450px; margin: 0 auto;">
-                <label class="input-group-text" for="atividadeSelect"><i class="bi bi-list-task me-1"></i> Nova atividade</label>
-                <select class="form-select" id="atividadeSelect"></select>
-                <button type="button" class="btn btn-success" id="btnCriarAtividade">
-                    <i class="bi bi-plus-circle"></i> Criar
-                </button>
-            </div>
-          </div>
-          <!-- Cards: rolagem horizontal -->
-          <div style="overflow-x: auto; white-space: nowrap; padding-bottom: 7px;">
-            <div class="d-inline-flex flex-row gap-4" id="cardsContainer" style="white-space: normal;"></div>
-          </div>
-          <hr>
-          <h6 class="fw-bold text-secondary text-center"><i class="bi bi-table"></i> Resumo das Alocações (sem Expediente)</h6>
-          <div class="row">
-            <div class="col-md-6">
-              <h6 class="text-center text-primary">Semana Atual</h6>
-              <table class="table table-bordered table-sm" id="tabelaResumoSemana">
-                <thead>
-                  <tr>
-                    <th>Servidor</th>
-                    <th>Alocações</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <div class="col-md-6">
-              <h6 class="text-center text-success">Mês Atual</h6>
-              <table class="table table-bordered table-sm" id="tabelaResumoMes">
-                <thead>
-                  <tr>
-                    <th>Servidor</th>
-                    <th>Alocações</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-          <!-- OBRIGATÓRIO PARA SALVAR -->
-          <input type="hidden" id="dataSelecionada" name="data">
-        </div>
-        <div class="modal-footer justify-content-center">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-            <i class="bi bi-x-circle"></i> Cancelar
-          </button>
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-save2"></i> Salvar
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
+{% include "modal_programar_atividade.html" %}
 {% endblock %}
 
 {% block scripts %}
@@ -140,6 +70,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const choicesServidores = new Choices('#multiServidores', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione os servidores...' });
     const choicesAtividades = new Choices('#multiAtividades', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione as atividades...' });
     const choicesVeiculos = new Choices('#multiVeiculos', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione os veículos...' });
+    window.choicesVeiculos = choicesVeiculos;
 
     function aguardarTodosChoicesProntos() {
         const esperados = ['multiServidores', 'multiAtividades', 'multiVeiculos'];
@@ -259,6 +190,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // ========== MODAL DINÂMICO CARDS ==========
+   
     function prepararModalProgramarAtividade(alocacoes = []) {
         const cardsDiv = document.getElementById('cardsContainer');
         cardsDiv.innerHTML = '';
@@ -283,10 +215,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (select) select.value = cardData.veiculo_id.toString();
             }
             const list = card.querySelector('.servidores-list');
+            const isExpediente = (cardData.atividade_nome?.toLowerCase() === "expediente administrativo");
             cardData.servidores.forEach(srv => {
-                list.appendChild(criarServidorDOM(srv.nome, srv.id));
+                list.appendChild(criarServidorDOM(srv.nome, srv.id, isExpediente));
             });
-            if (cardData.atividade_nome?.toLowerCase() === "expediente administrativo") {
+            if (isExpediente) {
                 card.id = "expediente";
             }
             cardsDiv.appendChild(card);
@@ -301,122 +234,14 @@ document.addEventListener("DOMContentLoaded", function() {
             const cardExp = document.getElementById('expediente');
             const servidoresSelecionados = choicesServidores.getValue();
             servidoresSelecionados.forEach(srv => {
-                const servidorDOM = criarServidorDOM(srv.label, srv.value);
+                const servidorDOM = criarServidorDOM(srv.label, srv.value, true); // true para expediente
                 cardExp.querySelector('.servidores-list').appendChild(servidorDOM);
             });
         }
     }
 
-    function criarCardAtividadeDOM(titulo, atividadeId = null) {
-        const card = document.createElement('div');
-        card.className = 'drag-card';
-        card.setAttribute('ondrop', 'soltar(event)');
-        card.setAttribute('ondragover', 'permitirSoltar(event)');
-        if (atividadeId) card.setAttribute('data-id', atividadeId);
 
-        if (titulo !== 'Expediente Administrativo') {
-            const btnClose = document.createElement('span');
-            btnClose.className = 'close';
-            btnClose.innerHTML = '&times;';
-            btnClose.onclick = () => {
-                const servidores = card.querySelectorAll('.drag-servidor');
-                const expCard = document.getElementById('expediente').querySelector('.servidores-list');
-                servidores.forEach(s => expCard.appendChild(s));
-                card.remove();
-            };
-            card.appendChild(btnClose);
-        }
 
-        const h = document.createElement('h6');
-        h.innerText = titulo;
-        card.appendChild(h);
-
-        const list = document.createElement('div');
-        list.className = 'servidores-list';
-        card.appendChild(list);
-
-        if (titulo !== 'Expediente Administrativo') {
-            const selectDiv = document.createElement('div');
-            selectDiv.className = "veiculo-div mt-auto";
-            selectDiv.style.width = "100%";
-
-            const selectLabel = document.createElement('label');
-            selectLabel.innerText = "Veículo:";
-            selectLabel.style.fontWeight = "bold";
-            selectLabel.style.display = "block";
-            selectLabel.className = "mb-1";
-
-            const select = document.createElement('select');
-            select.className = "form-select form-select-sm";
-            select.style.width = "100%";
-            select.setAttribute('data-select-veiculo', '');
-
-            choicesVeiculos.getValue().forEach(v => {
-                const opt = document.createElement('option');
-                opt.value = v.value;
-                opt.text = v.label;
-                select.appendChild(opt);
-            });
-
-            selectDiv.appendChild(selectLabel);
-            selectDiv.appendChild(select);
-            card.appendChild(selectDiv);
-        }
-        return card;
-    }
-
-    function criarServidorDOM(nome, valor) {
-        const div = document.createElement('div');
-        div.className = 'drag-servidor';
-        div.setAttribute('draggable', 'true');
-        div.setAttribute('data-id', valor);
-        div.innerText = nome;
-        div.ondragstart = arrastar;
-        return div;
-    }
-
-    // DRAG AND DROP
-    let draggedItem = null;
-    window.arrastar = function(ev) {
-        draggedItem = ev.target;
-    }
-    window.permitirSoltar = function(ev) {
-        ev.preventDefault();
-        ev.currentTarget.classList.add("drag-over");
-    }
-    window.soltar = function(ev) {
-        ev.preventDefault();
-        if (draggedItem && ev.currentTarget !== draggedItem.parentNode) {
-            if (ev.currentTarget.parentNode && ev.currentTarget.parentNode.id !== "expediente") {
-                if (!draggedItem.querySelector('.btn-sm')) {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn btn-sm btn-danger ms-2';
-                    btn.innerHTML = '<i class="bi bi-x"></i>';
-                    btn.onclick = function(e) {
-                        document.getElementById("expediente").querySelector('.servidores-list').appendChild(draggedItem);
-                        btn.remove();
-                        e.stopPropagation();
-                    };
-                    draggedItem.appendChild(btn);
-                }
-            } else {
-                draggedItem.querySelector('.btn-sm')?.remove();
-            }
-            ev.currentTarget.querySelector('.servidores-list').appendChild(draggedItem);
-        }
-        ev.currentTarget.classList.remove("drag-over");
-    }
-
-    // Criar novo card ao clicar em "Criar"
-    document.getElementById('btnCriarAtividade').onclick = function() {
-        const atividadeSel = document.getElementById('atividadeSelect');
-        const nomeAtividade = atividadeSel.options[atividadeSel.selectedIndex]?.text;
-        const atividadeId = atividadeSel.value;
-        if (!nomeAtividade) return alert('Selecione a atividade!');
-        const existe = Array.from(document.querySelectorAll('.drag-card h6')).some(el => el.innerText == nomeAtividade);
-        if (existe) return alert('Já existe um card para esta atividade.');
-        document.getElementById('cardsContainer').appendChild(criarCardAtividadeDOM(nomeAtividade, atividadeId));
-    };
 
     // Salvar programação (submit do modal)
     document.getElementById('formProgramarAtividade').addEventListener('submit', function(event) {
@@ -469,4 +294,6 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 });
 </script>
+<script src="{% static 'js/cards_programar_atividades.js' %}"></script>
+
 {% endblock %}
