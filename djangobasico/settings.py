@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'veiculos.apps.VeiculosConfig', 
     'pagina_programacao', 
     'descanso',
+    'plantao.apps.PlantaoConfig', 
 ]
 
 MIDDLEWARE = [

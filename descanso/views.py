@@ -3,6 +3,7 @@ from supabase import create_client
 from datetime import datetime, timedelta  
 from django.http import JsonResponse
 import calendar
+from .models import Descanso
 
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"
@@ -289,8 +290,48 @@ def descansos_do_mes(request):
                 resultado.append({
                     "nome": servidor["nome"],
                     "tipo_descanso": d["tipo"],
-                    "data_inicio": ini.isoformat(),  # <-- ✅ ISO formatado
-                    "data_fim": fim.isoformat()       # <-- ✅ ISO formatado
+                    "data_inicio": ini.isoformat(),  
+                    "data_fim": fim.isoformat()       
+                })
+
+    return JsonResponse(resultado, safe=False)
+
+def descansos_intervalo(request):
+    data_inicial = request.GET.get('data_inicial')
+    data_final = request.GET.get('data_final')
+    unidade_id = int(request.GET.get("unidade_id", 1))
+    if not data_inicial or not data_final:
+        return JsonResponse([], safe=False)
+
+    from datetime import datetime
+
+    dt_ini = datetime.strptime(data_inicial, "%d/%m/%Y").date()
+    dt_fim = datetime.strptime(data_final, "%d/%m/%Y").date()
+
+    servidores = supabase.table("servidores") \
+        .select("id, nome") \
+        .eq("status", "Ativo") \
+        .eq("unidade_id", unidade_id) \
+        .execute().data
+    servidor_ids = [s["id"] for s in servidores]
+
+    descansos = supabase.table("descansos") \
+        .select("*") \
+        .in_("servidor_id", servidor_ids) \
+        .execute().data
+
+    resultado = []
+    for d in descansos:
+        ini = datetime.strptime(d["data_inicio"], "%Y-%m-%d").date()
+        fim = datetime.strptime(d["data_fim"], "%Y-%m-%d").date()
+        if ini <= dt_fim and fim >= dt_ini:
+            servidor = next((s for s in servidores if s["id"] == d["servidor_id"]), None)
+            if servidor:
+                resultado.append({
+                    "nome": servidor["nome"],
+                    "tipo_descanso": d["tipo"],
+                    "data_inicio": ini.isoformat(),
+                    "data_fim": fim.isoformat()
                 })
 
     return JsonResponse(resultado, safe=False)

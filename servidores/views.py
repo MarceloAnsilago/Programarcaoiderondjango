@@ -85,7 +85,7 @@ def servidores_ativos(request):
     status = "Ativo"
     servidores = (
         supabase.table("servidores")
-        .select("id, nome")
+        .select("id, nome, telefone")   # <-- Adicione telefone aqui!
         .eq("status", status)
         .eq("unidade_id", unidade_id)
         .execute()

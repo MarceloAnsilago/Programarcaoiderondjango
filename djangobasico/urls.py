@@ -26,4 +26,5 @@ urlpatterns = [
     path('programacao/', include('pagina_programacao.urls')),
     path('descanso/', include('descanso.urls')),
     path('', lambda request: redirect('/servidores/')),
+    path('plantao/', include('plantao.urls')),
 ]

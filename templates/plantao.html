@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% block title %}Plantão{% endblock %}
+
+{% block content %}
+<h2>
+    <i class="bi bi-shield-lock" style="color:#0d6efd; margin-right: 6px;"></i>
+    Gestão de Plantão para recebimento de produtos e agrotóxicos
+</h2>
+
+<div class="mt-4">
+    <h5>
+        <i class="bi bi-calendar-range" style="color:#073074; margin-right: 7px;"></i>
+        Selecione o período para definir o plantão
+    </h5>
+    <form id="formPlantao">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="data_inicial" class="form-label">
+                    <i class="bi bi-clock" style="color:#0d6efd; margin-right: 4px;"></i>
+                    Data Inicial
+                </label>
+                <input type="text" class="form-control datetimepicker" id="data_inicial" name="data_inicial" placeholder="Selecione a data inicial">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="data_final" class="form-label">
+                    <i class="bi bi-clock-history" style="color:#0d6efd; margin-right: 4px;"></i>
+                    Data Final
+                </label>
+                <input type="text" class="form-control datetimepicker" id="data_final" name="data_final" placeholder="Selecione a data final">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-search"></i> Buscar Descansos
+        </button>
+    </form>
+    <div id="blocoDescansoPlantao" class="mt-4"></div>
+
+    <!-- MultiSelect -->
+    <div class="mt-4" id="boxMultiSelectServidores" style="max-width: 800px; margin: 0 auto; display:none;">
+        <label class="fw-semibold mb-2" for="multiServidores">
+            <i class="bi bi-people"></i> Servidores Disponíveis
+        </label>
+        <select id="multiServidores" class="form-control" multiple></select>
+    </div>
+
+    <!-- Grid de escala -->
+    <div id="escalaPlantaoGrid" class="mt-4"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+    {{ block.super }}
+    <!-- Flatpickr Date Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <!-- Choices.js para multiselect -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+
+    <style>
+        #boxMultiSelectServidores, .choices, #multiServidores {
+            width: 100%;
+            max-width: 100%;
+        }
+        .choices__inner {
+            min-height: 44px;
+            max-height: 110px;
+            font-size: 1.03rem;
+        }
+        .choices__list--multiple .choices__item {
+            background: #073074 !important;
+            color: #fff !important;
+            border-radius: 6px !important;
+            font-weight: 600;
+        }
+    </style>
+
+    <script>
+        flatpickr(".datetimepicker", {
+            dateFormat: "d/m/Y",
+            locale: "pt"
+        });
+
+        let servidoresDisponiveis = [];
+        let escalaServidoresSelecionados = []; // IDs
+        let semanasGeradas = [];
+
+        function carregarBlocoDescansoPorIntervalo(dataIni, dataFim) {
+            if (!dataIni || !dataFim) return Promise.resolve('');
+            return fetch(`/descanso/api/descansos-intervalo/?data_inicial=${encodeURIComponent(dataIni)}&data_final=${encodeURIComponent(dataFim)}`)
+                .then(resp => resp.json());
+        }
+
+        function parseDateBR(str) {
+            const [dia, mes, ano] = str.split('/');
+            return new Date(+ano, +mes - 1, +dia);
+        }
+        function formatarData(d) {
+            return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth()+1)).slice(-2) + "/" + d.getFullYear();
+        }
+
+        function gerarSemanasDoPeriodo(dtIni, dtFim) {
+            let semanas = [];
+            let atual = new Date(dtIni);
+            atual.setHours(0,0,0,0);
+            while (atual <= dtFim) {
+                let inicio = new Date(atual);
+                let fim = new Date(inicio);
+                fim.setDate(fim.getDate() + (6 - fim.getDay()));
+                if (fim > dtFim) fim = new Date(dtFim);
+                semanas.push([new Date(inicio), new Date(fim)]);
+                atual = new Date(fim);
+                atual.setDate(atual.getDate() + 1);
+            }
+            return semanas;
+        }
+
+        function montarGridEscala(semanas, servidoresSelecionados) {
+            let html = `
+                <h6 class="fw-bold text-success mb-2">
+                    <i class="bi bi-list-task"></i> Escala de Plantão Selecionada
+                </h6>
+                <table class="table table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Data</th>
+                            <th>Nome</th>
+                            <th>Telefone</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            for (let i = 0; i < semanas.length; i++) {
+                const [ini, fim] = semanas[i];
+                const servidorId = servidoresSelecionados[i];
+                let servidor = null;
+                if (servidorId) {
+                    servidor = servidoresDisponiveis.find(s => s.id == servidorId);
+                }
+                html += `
+                    <tr data-semana-idx="${i}">
+                        <td>${formatarData(ini)} a ${formatarData(fim)}</td>
+                        <td>${servidor ? servidor.nome : ''}</td>
+                        <td>${servidor ? servidor.telefone : ''}</td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-secondary btn-sm btn-mover" data-dir="up" ${i === 0 ? "disabled" : ""}><i class="bi bi-arrow-up"></i> Mover</button>
+                            <button type="button" class="btn btn-secondary btn-sm btn-mover" data-dir="down" ${i === semanas.length-1 ? "disabled" : ""}><i class="bi bi-arrow-down"></i> Mover</button>
+                        </td>
+                    </tr>
+                `;
+            }
+            html += `</tbody></table>`;
+            document.getElementById('escalaPlantaoGrid').innerHTML = html;
+
+            // Eventos dos botões Mover
+            document.querySelectorAll('.btn-mover').forEach(btn => {
+                btn.onclick = function() {
+                    const tr = btn.closest('tr');
+                    const idx = parseInt(tr.getAttribute('data-semana-idx'));
+                    const dir = btn.getAttribute('data-dir');
+                    moverServidorNaEscala(idx, dir);
+                };
+            });
+        }
+
+        function moverServidorNaEscala(idx, dir) {
+            if (dir === "up" && idx > 0) {
+                [escalaServidoresSelecionados[idx-1], escalaServidoresSelecionados[idx]] =
+                    [escalaServidoresSelecionados[idx], escalaServidoresSelecionados[idx-1]];
+            }
+            if (dir === "down" && idx < escalaServidoresSelecionados.length - 1) {
+                [escalaServidoresSelecionados[idx+1], escalaServidoresSelecionados[idx]] =
+                    [escalaServidoresSelecionados[idx], escalaServidoresSelecionados[idx+1]];
+            }
+            montarGridEscala(semanasGeradas, escalaServidoresSelecionados);
+        }
+
+        // MULTI SELECT Choices
+        let choicesInstance = null;
+
+        document.getElementById('formPlantao').onsubmit = function(e) {
+            e.preventDefault();
+            const dataIni = document.getElementById('data_inicial').value;
+            const dataFim = document.getElementById('data_final').value;
+            const unidade_id = 1;
+
+            document.getElementById('escalaPlantaoGrid').innerHTML = "";
+            document.getElementById('boxMultiSelectServidores').style.display = "none";
+            const descansoContainer = document.getElementById('blocoDescansoPlantao');
+            descansoContainer.innerHTML = `<div class="text-center my-2"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
+
+            Promise.all([
+                carregarBlocoDescansoPorIntervalo(dataIni, dataFim),
+                fetch(`/servidores/ativos/?unidade_id=${unidade_id}`).then(r => r.json())
+            ]).then(([descansos, servidores]) => {
+                // Renderiza tabela de folgas
+                let html = '';
+                if (!descansos || descansos.length === 0) {
+                    html = '<div class="alert alert-info">Nenhum servidor em descanso/folga neste período.</div>';
+                } else {
+                    html = `<div class="mt-4">
+                        <h6 class="text-warning fw-bold text-center">
+                            <i class="bi bi-moon"></i> Servidores em Descanso/Folga no Período Selecionado
+                        </h6>
+                        <table class="table table-warning table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Tipo de Descanso</th>
+                                    <th>Período</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${descansos.map(d => {
+                                    const ini = new Date(d.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR');
+                                    const fim = new Date(d.data_fim + 'T00:00:00').toLocaleDateString('pt-BR');
+                                    return `<tr><td>${d.nome}</td><td>${d.tipo_descanso}</td><td>${ini} a ${fim}</td></tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>`;
+                }
+                descansoContainer.innerHTML = html;
+
+                // Filtra disponíveis
+                const folgaNomes = descansos.map(d => d.nome);
+                servidoresDisponiveis = servidores.filter(s => !folgaNomes.includes(s.nome));
+
+                // Gera as semanas
+                semanasGeradas = gerarSemanasDoPeriodo(parseDateBR(dataIni), parseDateBR(dataFim));
+
+                // MultiSelect
+                const selectEl = document.getElementById('multiServidores');
+                selectEl.innerHTML = '';
+                servidoresDisponiveis.forEach(s => {
+                    let opt = document.createElement("option");
+                    opt.value = s.id;
+                    opt.text = s.nome;
+                    selectEl.appendChild(opt);
+                });
+                if (choicesInstance) choicesInstance.destroy();
+                choicesInstance = new Choices(selectEl, {
+                    removeItemButton: true,
+                    placeholder: true,
+                    placeholderValue: 'Selecione os servidores...',
+                    noResultsText: 'Nenhum disponível',
+                    shouldSort: true
+                });
+
+                document.getElementById('boxMultiSelectServidores').style.display = "";
+
+                selectEl.addEventListener('change', function() {
+                    escalaServidoresSelecionados = Array.from(this.selectedOptions).map(o => o.value).slice(0, semanasGeradas.length);
+                    montarGridEscala(semanasGeradas, escalaServidoresSelecionados);
+                });
+
+                // Seleciona todos por padrão, no limite de semanas
+                const idsPadrao = servidoresDisponiveis.map(s => s.id.toString()).slice(0, semanasGeradas.length);
+                choicesInstance.setChoiceByValue(idsPadrao);
+                escalaServidoresSelecionados = idsPadrao;
+                montarGridEscala(semanasGeradas, escalaServidoresSelecionados);
+            });
+        };
+    </script>
+{% endblock %}
