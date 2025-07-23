@@ -1,0 +1,97 @@
+<!-- ==== MODAL ==== -->
+<div class="modal fade" id="modalProgramarAtividade" tabindex="-1" aria-labelledby="modalProgramarAtividadeLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <form id="formProgramarAtividade">
+        <div class="modal-header justify-content-center">
+          <div class="w-100 text-center">
+            <h5 class="modal-title fw-bold" id="modalProgramarAtividadeLabel" style="display: flex; align-items: center; justify-content: center;">
+                <i class="bi bi-plus-circle me-2 text-primary" style="font-size: 1.7rem;"></i>
+                Programar Atividade para <span id="dataModalLabel" class="ms-2"></span>
+            </h5>
+          </div>
+          <button type="button" class="btn-close position-absolute end-0 me-3" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+
+          <!-- Seleção de Nova Atividade -->
+          <div class="mb-4">
+            <div class="input-group justify-content-center" style="max-width: 450px; margin: 0 auto;">
+                <label class="input-group-text" for="atividadeSelect"><i class="bi bi-list-task me-1"></i> Nova atividade</label>
+                <select class="form-select" id="atividadeSelect"></select>
+                <button type="button" class="btn btn-success" id="btnCriarAtividade">
+                    <i class="bi bi-plus-circle"></i> Criar
+                </button>
+            </div>
+          </div>
+
+          <!-- Cards: rolagem horizontal -->
+          <div style="overflow-x: auto; white-space: nowrap; padding-bottom: 7px;">
+            <div class="d-inline-flex flex-row gap-4" id="cardsContainer" style="white-space: normal;"></div>
+          </div>
+
+          <hr>
+
+          <!-- ==== Servidores em Descanso/Folga ==== -->
+          <div class="mb-3" id="descansoContainer">
+            <div class="fw-bold text-warning text-center mb-1" style="font-size:1.15em;">
+              <i class="bi bi-moon"></i> Servidores em Descanso/Folga
+            </div>
+            <table class="table table-bordered table-sm table-warning" id="tabelaDescanso">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Tipo de Descanso</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Resumo das Alocações -->
+          <h6 class="fw-bold text-secondary text-center mt-4"><i class="bi bi-table"></i> Resumo das Alocações (sem Expediente)</h6>
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="text-center text-primary">Semana Atual</h6>
+              <table class="table table-bordered table-sm" id="tabelaResumoSemana">
+                <thead>
+                  <tr>
+                    <th>Servidor</th>
+                    <th>Alocações</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-center text-success">Mês Atual</h6>
+              <table class="table table-bordered table-sm" id="tabelaResumoMes">
+                <thead>
+                  <tr>
+                    <th>Servidor</th>
+                    <th>Alocações</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- OBRIGATÓRIO PARA SALVAR -->
+          <input type="hidden" id="dataSelecionada" name="data">
+        </div>
+
+        <div class="modal-footer justify-content-center">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save2"></i> Salvar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

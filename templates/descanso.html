@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- TUDO que não é mapa recebe class="no-print" -->
+<div class="container mt-4 no-print">
+    <h2>
+        <i class="bi bi-moon" style="color: #073074;"></i>
+        Descanso dos Servidores
+    </h2>
+    <table class="table table-bordered align-middle">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Cargo</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in servidores %}
+            <tr>
+                <td>
+                    <button class="btn btn-link p-0 toggle-descansos"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#descansos-{{ s.id }}"
+                            aria-expanded="false"
+                            aria-controls="descansos-{{ s.id }}">
+                        <i class="bi bi-caret-right-fill" id="icon-{{ s.id }}"></i>
+                    </button>
+                    <strong>{{ s.nome }}</strong>
+                </td>
+                <td>{{ s.cargo }}</td>
+                <td>{{ s.status }}</td>
+                <td>
+                    <a href="{% url 'adicionar_descanso' servidor_id=s.id %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-circle"></i> Inserir
+                    </a>
+                </td>
+            </tr>
+            <tr class="collapse" id="descansos-{{ s.id }}">
+                <td colspan="4">
+                    <b>Períodos de Descanso</b>
+                    <table class="table table-sm table-bordered mt-2 mb-0">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Início</th>
+                                <th>Fim</th>
+                                <th>Observação / Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in s.descansos %}
+                            <tr>
+                                <td>{{ d.tipo }}</td>
+                                <td>{{ d.data_inicio }}</td>
+                                <td>{{ d.data_fim }}</td>
+                                <td>
+                                    {{ d.observacao }}
+                                    <div class="d-flex gap-1 mt-1">
+                                        <a href="{% url 'editar_descanso' descanso_id=d.id %}" class="btn btn-outline-primary btn-sm" title="Editar">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+                                        <form action="{% url 'excluir_descanso' descanso_id=d.id %}" method="post" style="display:inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Excluir" onclick="return confirm('Tem certeza que deseja excluir este período?');">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4">Nenhum período cadastrado.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- TÍTULO E BOTÃO ABAIXO -->
+<div class="container no-print" style="margin-top:2.5rem; margin-bottom:0.7rem;">
+    <h3 style="font-weight:bold;">
+        <i class="bi bi-geo-alt" style="color:#073074;"></i>
+        Mapa / Escala de Férias {{ ano }}
+    </h3>
+    <button class="btn btn-map-print" onclick="printDivConteudo('mapa-escala-imprimir')">
+        <i class="bi bi-printer"></i> Imprimir Mapa
+    </button>
+</div>
+
+<!-- MAPA ESCONDIDO, SÓ APARECE NA IMPRESSÃO -->
+<div class="container mt-4 only-print" id="mapa-escala-imprimir" style="display:none;">
+    <h3 style="margin: 0 0 10px 0; font-weight: bold;">
+        <i class="bi bi-geo-alt" style="color:#073074;"></i>
+        Mapa / Escala de Férias {{ ano }}
+    </h3>
+    <hr>
+    <div>
+        {% for mes in meses %}
+            {% if mes.linhas_servidor %}
+                <div class="mb-3 border p-2">
+                    <div class="mb-2 text-center" style="font-weight:bold; font-size:1.3em;">
+                        {{ mes.nome }} {{ ano }}
+                    </div>
+                    {% for linha in mes.linhas_servidor %}
+                        <div style="margin-left:20px; font-weight:bold;">{{ linha.nome }}</div>
+                        <div style="margin-left:20px;">
+                            {% for dia in mes.dias %}
+                                {% if dia in linha.periodos_dias %}
+                                    <span class="dia-ferias">{{ dia }}</span>
+                                {% else %}
+                                    <span class="dia-normal">{{ dia }}</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <div class="mt-4" style="font-size:0.9em; font-style:italic;">
+        Legenda: <span class="dia-ferias">&nbsp;</span>
+        Dias em preto indicam o período de férias do servidor.
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Troca seta do botão ao abrir/fechar
+    document.querySelectorAll('.toggle-descansos').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const icon = this.querySelector('i');
+            const targetId = this.getAttribute('data-bs-target');
+            const row = document.querySelector(targetId);
+            setTimeout(function() {
+                if (row.classList.contains('show')) {
+                    icon.classList.remove('bi-caret-down-fill');
+                    icon.classList.add('bi-caret-right-fill');
+                } else {
+                    icon.classList.remove('bi-caret-right-fill');
+                    icon.classList.add('bi-caret-down-fill');
+                }
+            }, 200);
+        });
+    });
+
+    // Função para imprimir só o mapa de férias (paisagem e visual limpo)
+    function printDivConteudo(divId) {
+        var div = document.getElementById(divId);
+        if (!div) {
+            alert('Bloco não encontrado: ' + divId);
+            return;
+        }
+        var conteudo = div.innerHTML;
+        var style = `
+            <style>
+                @page { size: landscape; }
+                body { margin: 2em; background: #fff; color: #000; font-family: Arial, sans-serif; }
+                h3 { margin-top: 0; }
+                .border { border: 1px solid #bbb !important; }
+                .mb-3 { margin-bottom: 1.5rem !important; }
+                .p-2 { padding: 0.5rem !important; }
+                .text-center { text-align: center !important; }
+                .mt-4 { margin-top: 1.5rem !important; }
+                .dia-ferias, .dia-normal {
+                    display: inline-flex !important;
+                    align-items: center;
+                    justify-content: center;
+                    vertical-align: middle;
+                    width: 22px;
+                    height: 22px;
+                    margin: 1px;
+                    font-size: 13px;
+                    border: 1px solid #555;
+                    box-sizing: border-box;
+                }
+                .dia-ferias { background: #111; color: #fff; }
+                .dia-normal { background: #fff; color: #111; }
+                .no-print, button { display: none !important; }
+            </style>
+        `;
+        var win = window.open('', '', 'width=1100,height=800');
+        win.document.write(`
+            <html>
+                <head>
+                    <title>Impressão Mapa de Férias</title>
+                    ${style}
+                </head>
+                <body>
+                    ${conteudo}
+                </body>
+            </html>
+        `);
+        win.document.close();
+        win.onload = function() {
+            win.focus();
+            win.print();
+            setTimeout(function() { win.close(); }, 200);
+        };
+    }
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.dia-ferias, .dia-normal {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    width: 22px;
+    height: 22px;
+    margin: 1px;
+    font-size: 13px;
+    border: 1px solid #007bff !important;
+    box-sizing: border-box;
+    border-radius: 4px;
+    font-weight: 500;
+    transition: background 0.3s;
+}
+.dia-ferias {
+    background: #007bff !important;
+    color: #fff !important;
+    border: 1.5px solid #0056b3 !important;
+}
+.dia-normal {
+    background: #f0f0f0 !important;
+    color: #111 !important;
+    border: 1px solid #ccc !important;
+}
+
+/* Estilo moderno para o botão do mapa */
+.btn-map-print {
+    background: linear-gradient(90deg, #1363c6 0%, #0d396a 100%);
+    color: #fff !important;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    padding: 0.65em 1.4em;
+    font-size: 1.07em;
+    box-shadow: 0 2px 10px rgba(19, 99, 198, 0.10);
+    transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+    letter-spacing: 0.02em;
+    outline: none;
+}
+.btn-map-print:hover, .btn-map-print:focus {
+    background: linear-gradient(90deg, #1d82e9 0%, #073074 100%);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(19, 99, 198, 0.17);
+    text-decoration: none;
+}
+.btn-map-print i {
+    margin-right: 5px;
+    font-size: 1.08em;
+    vertical-align: -1px;
+}
+@media (max-width: 700px) {
+    .btn-map-print {
+        width: 100%;
+        margin-top: 1rem;
+    }
+}
+
+.only-print { display: none !important; }
+@media print {
+  .only-print { display: block !important; }
+  .sidebar, .sidebar-menu, .menu-lateral, .offcanvas, .no-print, nav, header {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  .container, .container-fluid {
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  #mapa-escala-imprimir .no-print, #mapa-escala-imprimir button {
+    display: none !important;
+  }
+  .dia-ferias {
+    background: #111 !important;
+    color: #fff !important;
+    border: 1px solid #555 !important;
+  }
+  .dia-normal {
+    background: #fff !important;
+    color: #111 !important;
+    border: 1px solid #555 !important;
+  }
+  .only-print { display: block !important; }
+}
+</style>
+{% endblock %}

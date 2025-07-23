@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Programar Atividades{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+    <h2><i class="bi bi-calendar3"></i> Programação de Atividades</h2>
+    <hr>
+    <!-- ==== FILTROS: MULTI-SELECTS ==== -->
+    <form class="mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="multiServidores" class="form-label">Servidores Ativos</label>
+                <select id="multiServidores" class="form-select" multiple></select>
+            </div>
+            <div class="col-md-4">
+                <label for="multiAtividades" class="form-label">Atividades Ativas</label>
+                <select id="multiAtividades" class="form-select" multiple></select>
+            </div>
+            <div class="col-md-4">
+                <label for="multiVeiculos" class="form-label">Veículos Ativos</label>
+                <select id="multiVeiculos" class="form-select" multiple></select>
+            </div>
+        </div>
+    </form>
+    <div id="calendar" class="mt-4"></div>
+</div>
+{% include "relatorios.html" %}
+{% include "modal_programar_atividade.html" %}
+{% endblock %}
+
+{% block scripts %}
+<!-- ==== SCRIPTS EXTERNOS ==== -->
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<!-- ==== CSS CARDS/BADGE ==== -->
+<style>
+    .drag-card { background: #f8fafc; border: 1.5px solid #cddaff; border-radius: 10px; min-width: 230px; min-height: 190px; padding: 13px 9px 9px 9px; margin-bottom: 8px; position: relative;}
+    .drag-card h6 { font-size: 16px; text-align: center; font-weight: 700; margin: 0 0 7px 0;}
+    .drag-servidor { background: #6597eeff; color: #fff; border-radius: 7px; margin-bottom: 6px; padding: 7px 10px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; cursor: grab;}
+    .drag-servidor .btn-sm { padding: 0 5px; font-size: 15px; margin-left: 6px;}
+    .drag-card .close { position: absolute; right: 10px; top: 6px; color: #999; font-size: 19px; cursor: pointer;}
+    .drag-card.drag-over { background: #e7ffe7 !important;}
+    .fc-daygrid-event.fc-event.fc-badge-programado {
+        background: #516b09 !important;
+        color: #ffffff !important;
+        font-weight: bold;
+        border-radius: 10px !important;
+        padding: 2px 12px !important;
+        border: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95em;
+        box-shadow: 0 1px 3px #0001;
+        margin: 2px auto !important;
+    }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const unidadeId = 1;
+
+    // ========== CHOICES MULTISELECT ==========
+
+    const choicesServidores = new Choices('#multiServidores', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione os servidores...' });
+    const choicesAtividades = new Choices('#multiAtividades', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione as atividades...' });
+    const choicesVeiculos = new Choices('#multiVeiculos', { removeItemButton: true, placeholder: true, placeholderValue: 'Selecione os veículos...' });
+    window.choicesVeiculos = choicesVeiculos;
+
+    function aguardarTodosChoicesProntos() {
+        const esperados = ['multiServidores', 'multiAtividades', 'multiVeiculos'];
+        const todosProntos = esperados.every(id => {
+            const el = document.getElementById(id);
+            return el && el.options && el.options.length > 0;
+        });
+        if (todosProntos) return Promise.resolve();
+        return new Promise((resolve) => {
+            const recebidos = new Set();
+            function listener(e) {
+                recebidos.add(e.detail.name);
+                if (esperados.every(name => recebidos.has(name))) {
+                    document.removeEventListener('choicesReady', listener);
+                    resolve();
+                }
+            }
+            document.addEventListener('choicesReady', listener);
+        });
+    }
+
+    function carregarMultiSelect(endpoint, choicesInstance, labelFn) {
+        fetch(endpoint + '?unidade_id=' + unidadeId)
+            .then(response => response.json())
+            .then(data => {
+                const options = data.map(item => ({
+                    value: item.id,
+                    label: labelFn(item),
+                    selected: true
+                }));
+                choicesInstance.setChoices(options, 'value', 'label', true);
+                options.forEach(opt => choicesInstance.setChoiceByValue(opt.value.toString()));
+                document.dispatchEvent(new CustomEvent('choicesReady', { detail: { name: choicesInstance.containerOuter.element.id } }));
+            });
+    }
+
+    carregarMultiSelect('/servidores/ativos/', choicesServidores, item => item.nome);
+    carregarMultiSelect('/atividades/ativos/', choicesAtividades, item => item.nome);
+    carregarMultiSelect('/veiculos/ativos/', choicesVeiculos, item => item.placa + ' - ' + item.modelo);
+
+    // ======== CALENDÁRIO E DATAS =========
+    let datasProgramadasEventos = [];
+    function carregarDatasProgramadas() {
+        return fetch('/programacao/datas_programadas/?unidade_id=1')
+            .then(response => response.json())
+            .then(datas => {
+                datasProgramadasEventos = datas.map(d => ({
+                    title: "Programado",
+                    start: d,
+                    allDay: true,
+                    display: 'list-item',
+                    color: '#09366b',
+                    textColor: '#fff',
+                    classNames: ['fc-badge-programado']
+                }));
+            });
+    }
+
+ 
+    carregarDatasProgramadas().then(function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'pt-br',
+            height: 650,
+            selectable: true,
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+            buttonText: { today: 'hoje', month: 'mês' },
+            events: datasProgramadasEventos,
+          
+            dateClick: function(info) {
+                const dataClicada = info.dateStr;
+                document.getElementById('dataSelecionada').value = dataClicada;
+                const [ano, mes, dia] = dataClicada.split('-');
+                document.getElementById('dataModalLabel').innerText = `${dia}/${mes}/${ano}`;
+
+                aguardarTodosChoicesProntos().then(() => {
+                    // 1. Busca dados de programação para a data
+                    fetch(`/programacao/detalhe/?data=${dataClicada}&unidade_id=${unidadeId}`)
+                        .then(r => r.json())
+                        .then(json => {
+                            prepararModalProgramarAtividade(json.alocacoes);
+                            carregarResumosDeAlocacao(dataClicada, unidadeId);
+
+                            // 2. Busca servidores em descanso nessa data
+                            fetch(`/descanso/api/descansos_na_data/?data=${dataClicada}&unidade_id=${unidadeId}`)
+                                .then(r => r.json())
+                                .then(descansos => {
+                                    // Popula a tabela de descanso no modal
+                                    popularTabelaDescanso(descansos);
+                                    // Armazena os IDs dos servidores em descanso para usar depois
+                                    window.idsServidoresEmDescanso = descansos.map(d => d.id);
+
+                                    // ATUALIZA O MULTI-SELECT FILTRANDO!
+                                    atualizarChoicesServidoresComFiltroDescanso();
+
+                                    // Agora sim: montar os cards com o filtro certo!
+                                    prepararModalProgramarAtividade(json.alocacoes);
+
+                                    // Abre o modal
+                                    var modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
+                                    modal.show();
+                                });
+                        });
+                });
+            },
+            datesSet: function(info) {
+                const ano = info.view.currentStart.getFullYear();
+                const mes = info.view.currentStart.getMonth() + 1;
+                window.popularSelectSemana(ano, mes);
+            }
+        });
+        calendar.render();
+    });
+
+    function carregarResumosDeAlocacao(data, unidadeId) {
+        fetch(`/programacao/resumo_alocacoes/?data=${data}&unidade_id=${unidadeId}`)
+            .then(response => response.json())
+            .then(resumo => {
+                // Semana
+                const tbodySemana = document.querySelector("#tabelaResumoSemana tbody");
+                tbodySemana.innerHTML = "";
+                resumo.semana.forEach(item => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `<td>${item.servidor}</td><td>${item.quantidade}</td>`;
+                    tbodySemana.appendChild(tr);
+                });
+                // Mês
+                const tbodyMes = document.querySelector("#tabelaResumoMes tbody");
+                tbodyMes.innerHTML = "";
+                resumo.mes.forEach(item => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `<td>${item.servidor}</td><td>${item.quantidade}</td>`;
+                    tbodyMes.appendChild(tr);
+                });
+            });
+    }
+
+    // ========== MODAL DINÂMICO CARDS ==========
+   
+    
+    function prepararModalProgramarAtividade(alocacoes = []) {
+        const cardsDiv = document.getElementById('cardsContainer');
+        cardsDiv.innerHTML = '';
+
+        // Sempre monta o select SEM "Expediente Administrativo"
+        const atividadeOptions = choicesAtividades.getValue()
+            .filter(opt => opt.label.toLowerCase() !== "expediente administrativo");
+        const selectAtividade = document.getElementById("atividadeSelect");
+        selectAtividade.innerHTML = '';
+        atividadeOptions.forEach(opt => {
+            let o = document.createElement('option');
+            o.value = opt.value;
+            o.text = opt.label;
+            selectAtividade.appendChild(o);
+        });
+
+        // Sempre monta os cards vindos do backend
+        alocacoes.forEach(cardData => {
+            const card = criarCardAtividadeDOM(cardData.atividade_nome, cardData.atividade_id);
+            if (cardData.veiculo_id) {
+                let select = card.querySelector('select[data-select-veiculo]');
+                if (select) select.value = cardData.veiculo_id.toString();
+            }
+            const list = card.querySelector('.servidores-list');
+            const isExpediente = (cardData.atividade_nome?.toLowerCase() === "expediente administrativo");
+            cardData.servidores.forEach(srv => {
+                list.appendChild(criarServidorDOM(srv.nome, srv.id, isExpediente));
+            });
+            if (isExpediente) {
+                card.id = "expediente";
+            }
+            cardsDiv.appendChild(card);
+        });
+
+        // CASO ESPECIAL: criando programação do zero, preenche Expediente com choices
+        if (
+            alocacoes.length === 1 &&
+            alocacoes[0].atividade_nome?.toLowerCase() === "expediente administrativo" &&
+            alocacoes[0].servidores.length === 0
+        ) {
+            const cardExp = document.getElementById('expediente');
+            const servidoresSelecionados = choicesServidores.getValue();
+            const idsDescanso = window.idsServidoresEmDescanso || [];
+            servidoresSelecionados.forEach(srv => {
+                if (!idsDescanso.includes(srv.value)) {
+                    const servidorDOM = criarServidorDOM(srv.label, srv.value, true); // true para expediente
+                    cardExp.querySelector('.servidores-list').appendChild(servidorDOM);
+                }
+            });
+        }
+    }
+
+    function popularTabelaDescanso(descansos) {
+        const tbody = document.querySelector('#tabelaDescanso tbody');
+        tbody.innerHTML = '';
+        if (descansos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">Nenhum servidor em descanso nesta data.</td></tr>';
+            return;
+        }
+        descansos.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${item.nome}</td><td>${item.tipo_descanso}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+    function atualizarChoicesServidoresComFiltroDescanso() {
+    fetch('/servidores/ativos/?unidade_id=' + unidadeId)
+      .then(response => response.json())
+      .then(data => {
+        const idsDescanso = window.idsServidoresEmDescanso || [];
+        const options = data
+          .filter(item => !idsDescanso.includes(item.id)) // Remove do select!
+          .map(item => ({
+              value: item.id,
+              label: item.nome,
+              selected: true
+          }));
+        choicesServidores.clearStore();
+        choicesServidores.setChoices(options, 'value', 'label', true);
+        options.forEach(opt => choicesServidores.setChoiceByValue(opt.value.toString()));
+        // Se usar evento customizado, dispare choicesReady se necessário!
+      });
+    }
+
+    // Salvar programação (submit do modal)
+    document.getElementById('formProgramarAtividade').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const alocacoes = [];
+        document.querySelectorAll('.drag-card').forEach(card => {
+            const atividade_nome = card.querySelector('h6').innerText;
+            const atividade_id = card.getAttribute('data-id');
+            let veiculo_id = null;
+            if (atividade_nome !== 'Expediente Administrativo') {
+                const selectVeiculo = card.querySelector('select[data-select-veiculo]');
+                if (selectVeiculo) {
+                    veiculo_id = selectVeiculo.value || null;
+                }
+            }
+            card.querySelectorAll('.drag-servidor').forEach(srv => {
+                if (atividade_id) {
+                    alocacoes.push({
+                        servidor_id: srv.getAttribute('data-id'),
+                        atividade_id: atividade_id,
+                        veiculo_id: veiculo_id,
+                        atividade_nome: atividade_nome
+                    });
+                }
+            });
+        });
+        const dataSelecionada = document.getElementById('dataSelecionada').value;
+        fetch('/programacao/salvar_programacao/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                data: dataSelecionada,
+                unidade_id: unidadeId,
+                alocacoes: alocacoes
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'ok'){
+                alert('Programação salva com sucesso!');
+            }else{
+                alert('Erro: ' + data.msg);
+            }
+        })
+        .catch(error => alert('Erro ao salvar programação!'));
+        var modal = bootstrap.Modal.getInstance(document.getElementById('modalProgramarAtividade'));
+        modal.hide();
+    });
+});
+</script>
+<script src="{% static 'js/cards_programar_atividades.js' %}"></script>
+
+{% endblock %}

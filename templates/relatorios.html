@@ -1,0 +1,784 @@
+<!-- INÍCIO: PAINEL DE IMPRESSÕES E RELATÓRIOS -->
+
+<div class="text-center mb-4 mt-5 painel-impressao-titulo">
+    <h4 class="fw-bold">
+        <i class="bi bi-printer" style="font-size: 2rem; vertical-align: -0.18em; margin-right: 6px;"></i>
+        Impressões
+    </h4>
+    <hr style="margin: 0 auto; width: 65%; color: #ddd;">
+</div>
+
+<div class="container mb-5">
+    <div class="row justify-content-center g-4">
+        <!-- Coluna 1: Programação Semanal -->
+        <div class="col-12 col-md-6">
+            <div class="bg-light p-4 rounded shadow-sm h-100 d-flex flex-column align-items-center" id="bloco-programacao-imprimir">
+               
+                <div class="w-100 d-flex align-items-center justify-content-between mb-3 titulo-sup-impressao">
+                    <h5 class="fw-bold mb-0 d-flex align-items-center">
+                        <i class="bi bi-calendar-week" style="font-size: 1.5rem; vertical-align: -0.18em; margin-right: 6px;"></i>
+                        Programação Semanal
+                    </h5>
+            
+                    
+                </div>
+                                <div class="mb-2 w-100" style="max-width:400px;">
+                    <label for="selectSemana" class="form-label fw-semibold">Escolha a semana</label>
+                    <select id="selectSemana" name="semana" class="form-select"></select>
+                </div>
+                <div class="row w-100 mt-3">
+                    <div class="col-6 d-flex flex-column align-items-center">
+                        <button type="button"
+                            class="btn btn-outline-primary mb-2 w-100"
+                            onclick="mostrarBloco('programacao'); carregarProgramacaoSemana();"
+                            id="btn-programacao-semana">
+                            <i class="bi bi-calendar"></i> Programação da Semana
+                        </button>
+                            <button onclick="printDivConteudo('bloco-programacao-imprimir')" class="btn btn-outline-secondary btn-sm w-100">
+                                <i class="bi bi-printer"></i> Imprimir Programação
+                            </button>
+                    </div>
+                    <div class="col-6 d-flex flex-column align-items-center">
+                        <a href="javascript:void(0);"
+                            class="btn btn-outline-success mb-2 w-100"
+                            onclick="mostrarBloco('relatorio'); gerarRelatorioSemana();"
+                            id="btn-relatorio-semana">
+                            <i class="bi bi-file-earmark-text"></i> Relatório da Semana
+                        </a>
+                        <button onclick="imprimirRelatorio()" class="btn btn-outline-secondary btn-sm w-100">
+                            <i class="bi bi-printer"></i> Imprimir Relatório
+                        </button>
+                    </div>
+                </div>
+                <div id="cabecalhoProgramacao" class="mb-3 w-100"></div>
+                <div id="resultadoProgramacao" class="w-100"></div>
+                <div id="resultadoRelatorio" class="w-100" style="display: none"></div>
+            </div>
+        </div>
+        
+        <!-- Coluna 2: Programação Mensal -->
+        <div class="col-12 col-md-6">
+            <!-- Adicione este DIV aqui -->
+            <div id="bloco-programacao-imprimir-mensal" class="bg-light p-4 rounded shadow-sm h-100 d-flex flex-column align-items-center">
+                <h5 class="fw-bold mb-3">
+                    <i class="bi bi-calendar-range" style="font-size: 1.5rem; vertical-align: -0.18em; margin-right: 6px;"></i>
+                    Programação Mensal
+                </h5>
+                <div class="mb-2 w-100" style="max-width:400px;">
+                    <label for="selectMes" class="form-label fw-semibold">Escolha o mês</label>
+                    <select id="selectMes" name="mes" class="form-select"></select>
+                </div>
+
+                <!-- Primeira linha: botões de gerar (2 colunas) -->
+                <div class="row w-100 mt-3">
+                    <div class="col-6 d-flex flex-column align-items-center">
+                        <button class="btn btn-outline-primary mb-2 w-100"
+                                onclick="mostrarBlocoMensal('programacao'); carregarProgramacaoMensal();"
+                                id="btn-programacao-mensal">
+                            <i class="bi bi-calendar-range"></i> Programação Mensal
+                        </button>
+                    </div>
+                    <div class="col-6 d-flex flex-column align-items-center">
+                        <button class="btn btn-outline-success mb-2 w-100"
+                                onclick="mostrarBlocoMensal('relatorio'); gerarRelatorioMensal();"
+                                id="btn-relatorio-mensal">
+                            <i class="bi bi-file-earmark-bar-graph"></i> Relatório Mensal
+                        </button>
+                    </div>
+                </div>
+                <!-- Segunda linha: botões de impressão (2 colunas) -->
+                <div class="row w-100">
+                    <div class="col-6 d-flex flex-column align-items-center">
+                        <button onclick="printDivConteudo('bloco-programacao-imprimir-mensal')" class="btn btn-outline-secondary btn-sm w-100" id="btn-imprimir-mensal">
+                            <i class="bi bi-printer"></i> Imprimir Programação Mensal
+                        </button>
+                    </div>
+                    <div class="col-6 d-flex flex-column align-items-center">
+                        <button onclick="mostrarBlocoMensal('relatorio'); setTimeout(()=>printDivConteudo('bloco-programacao-imprimir-mensal'),150);" class="btn btn-outline-secondary btn-sm w-100" id="btn-imprimir-relatorio-mensal">
+                            <i class="bi bi-printer"></i> Imprimir Relatório Mensal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Containers de resultado -->
+                <div id="resultadoProgramacaoMensal" class="w-100" style="display: none"></div>
+                <div id="resultadoRelatorioMensal" class="w-100" style="display: none"></div>
+            </div>
+            <!-- Feche o DIV aqui -->
+        </div>
+        <!-- fim Coluna 2: Programação Mensal -->
+       
+    </div>
+</div>
+<!-- FIM: PAINEL DE IMPRESSÕES E RELATÓRIOS -->
+
+<!-- INÍCIO: CSS DO PAINEL -->
+
+<style>
+.shadow-sm { box-shadow: 0 2px 8px rgba(60,60,60,.06); }
+.bg-white { background: #fff; }
+@media (min-width: 992px) {
+    .col-md-6 { min-width: 440px; }
+}
+@media (max-width: 768px) {
+    .row > div { margin-bottom: 2rem; }
+}
+@media print {
+    body * { display: none !important; }
+    #bloco-programacao-imprimir, #bloco-programacao-imprimir * {
+        display: block !important;
+    }
+}
+</style>
+<!-- FIM: CSS DO PAINEL -->
+
+<!-- INÍCIO: SCRIPTS DO PAINEL DE PROGRAMAÇÃO -->
+<script>
+console.log("🛠️ Iniciando calendário: anoAtualCalendario e mesAtualCalendario são nulos.");
+var mesAtualCalendario = null;
+var anoAtualCalendario = null;
+// Função utilitária: retorna array com as semanas do mês
+function popularSelectMes() {
+    fetch('/programacao/api/programacao-meses-disponiveis/')
+    .then(resp => resp.json())
+    .then(meses => {
+        let select = document.getElementById("selectMes");
+        select.innerHTML = "";
+        meses.forEach(m => {
+            let opt = document.createElement('option');
+            opt.value = m.mes; // "2025-07"
+            opt.text = m.label; // "Julho/2025"
+            select.add(opt);
+        });
+
+        // Seleciona o último mês por padrão
+        if (meses.length) {
+            const partes = select.value.split("-");  // ex: ["2025", "07"]
+            anoAtualCalendario = parseInt(partes[0]);
+            mesAtualCalendario = parseInt(partes[1]);
+            console.log("📅 Valores atualizados:", anoAtualCalendario, mesAtualCalendario);
+        }
+        // Atualiza ao mudar
+        select.addEventListener('change', function() {
+            const partes = this.value.split("-");
+            anoAtualCalendario = parseInt(partes[0]);
+            mesAtualCalendario = parseInt(partes[1]);
+            console.log("📦 Mês alterado manualmente:", anoAtualCalendario, mesAtualCalendario);
+
+            document.getElementById('resultadoProgramacaoMensal').style.display = "none";
+            document.getElementById('resultadoRelatorioMensal').style.display = "none";
+        });
+    });
+}
+function semanasDoMes(ano, mes) {
+    let semanas = [];
+    let dt = new Date(ano, mes - 1, 1);
+    while (dt.getMonth() === mes - 1) {
+        let inicio = new Date(dt);
+        let fim = new Date(dt);
+        fim.setDate(dt.getDate() + (6 - dt.getDay()));
+        if (fim.getMonth() !== mes - 1) {
+            fim = new Date(ano, mes, 0);
+        }
+        semanas.push({
+            inicio: new Date(inicio),
+            fim: new Date(fim)
+        });
+        dt.setDate(fim.getDate() + 1);
+    }
+    return semanas;
+}
+
+// Popula o select da semana sempre que abre a página
+function popularSelectSemana(ano, mes) {
+    anoAtualCalendario = ano;
+    mesAtualCalendario = mes;
+
+    const semanas = semanasDoMes(ano, mes);
+    const nomes = ["Primeira", "Segunda", "Terceira", "Quarta", "Quinta", "Sexta"];
+    let select = document.getElementById("selectSemana");
+    select.innerHTML = "";
+    if (semanas.length === 0) {
+        let opt = document.createElement('option');
+        opt.text = 'Sem semanas disponíveis';
+        select.add(opt);
+        return;
+    }
+    semanas.forEach((sem, idx) => {
+        let opt = document.createElement('option');
+        let ini = sem.inicio.toLocaleDateString();
+        let fim = sem.fim.toLocaleDateString();
+        opt.value = idx;
+        opt.text = `${nomes[idx]} semana: ${ini} a ${fim}`;
+        select.add(opt);
+    });
+}
+
+function mostrarBlocoMensal(tipo) {
+    document.getElementById('resultadoProgramacaoMensal').style.display = (tipo === 'programacao') ? '' : 'none';
+    document.getElementById('resultadoRelatorioMensal').style.display = (tipo === 'relatorio') ? '' : 'none';
+}
+
+function carregarProgramacaoMensal() {
+    const unidade_id = 1;
+    const mes_ano = document.getElementById('selectMes').value; // "2025-07"
+    const [ano, mes] = mes_ano.split('-');
+    const container = document.getElementById('resultadoProgramacaoMensal');
+    container.innerHTML = `<div class="text-center my-3"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
+
+    fetch(`/programacao/api/programacao-mes/?unidade_id=${unidade_id}&ano=${ano}&mes=${mes}`)
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.programacoes && Object.keys(data.programacoes).length) {
+            let cabecalhoMensal = `
+                <table class="table table-bordered text-center mb-0" style="margin-bottom:10px;">
+                    <tr>
+                        <th colspan="2" style="font-size:1.3rem; background:#eee;">Programação Mensal</th>
+                    </tr>
+                    <tr>
+                        <td colspan="2" style="font-size:1rem">Mês: ${("0"+mes).slice(-2)}/${ano}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-start"><b>Unidade:</b> Unidade Teste</td>
+                        <td class="text-start"><b>Supervisão:</b> Sem supervisão</td>
+                    </tr>
+                </table>
+            `;
+
+            let html = `<table class="table table-bordered table-sm"><tbody>`;
+            Object.entries(data.programacoes)
+                .sort(([dataA], [dataB]) => new Date(dataA) - new Date(dataB))
+                .forEach(([dataStr, atividades]) => {
+                    let dt = new Date(dataStr);
+                    let diaSemana = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
+                    diaSemana = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+                    let dataExt = dt.toLocaleDateString();
+
+                    html += `<tr class="bg-light fw-bold">
+                        <td class="text-center" colspan="4" style="font-size:1.15em">${diaSemana}, ${dataExt}</td>
+                    </tr>
+                    <tr>
+                        <th style="width: 160px;" class="text-center">Atividade</th>
+                        <th class="text-center">Servidores</th>
+                        <th class="text-center">Veículo</th>
+                        <th class="text-center">
+                            Realizado<br>
+                            <span style="font-size:0.85em;">
+                                <span style="margin-right:18px;">Sim</span>Não
+                            </span>
+                        </th>
+                    </tr>`;
+
+                    let exp_idx = atividades.findIndex(a => (a.atividade || '').toLowerCase().includes("expediente administrativo"));
+                    if (exp_idx !== -1) {
+                        let item = atividades.splice(exp_idx, 1)[0];
+                        html += `
+                        <tr>
+                            <td class="text-center"><b>${item.atividade || ''}</b></td>
+                            <td class="text-center">${item.servidores ? item.servidores.join(', ') : ''}</td>
+                            <td class="text-center">${item.veiculo || ''}</td>
+                            <td class="text-center">
+                                <div class="d-flex flex-row justify-content-center gap-2">
+                                    <label style="font-weight: normal; margin-right: 8px;">
+                                        <input type="radio" disabled>
+                                    </label>
+                                    <label style="font-weight: normal;">
+                                        <input type="radio" disabled>
+                                    </label>
+                                </div>
+                            </td>
+                        </tr>`;
+                    }
+                    atividades.forEach((item, i) => {
+                        html += `
+                        <tr>
+                            <td class="text-center"><b>${item.atividade || ''}</b></td>
+                            <td class="text-center">${item.servidores ? item.servidores.join(', ') : ''}</td>
+                            <td class="text-center">${item.veiculo || ''}</td>
+                            <td class="text-center">
+                                <div class="d-flex flex-row justify-content-center gap-2">
+                                    <label style="font-weight: normal; margin-right: 8px;">
+                                        <input type="radio" disabled>
+                                    </label>
+                                    <label style="font-weight: normal;">
+                                        <input type="radio" disabled>
+                                    </label>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+                });
+            html += `</tbody></table>`;
+            container.innerHTML = cabecalhoMensal + html;
+
+            // Agora adiciona os descansos do mês
+            carregarBlocoDescansoMensal(unidade_id, ano, mes).then(descansoHtml => {
+                container.innerHTML += descansoHtml;
+            });
+
+        } else {
+            container.innerHTML = `<div class="alert alert-info">Nenhuma programação encontrada para este mês.</div>`;
+        }
+    })
+    .catch(err => {
+        container.innerHTML = `<div class="alert alert-danger">Erro ao buscar programação mensal!</div>`;
+    });
+}
+
+function gerarRelatorioMensal() {
+    const unidade_id = 1;
+    const mes_ano = document.getElementById('selectMes').value; // "2025-07"
+    const [ano, mes] = mes_ano.split('-');
+    const container = document.getElementById('resultadoRelatorioMensal');
+    container.innerHTML = `<div class="text-center my-3"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
+
+    fetch(`/programacao/api/relatorio-mensal/?unidade_id=${unidade_id}&ano=${ano}&mes=${mes}`)
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.servidores && Object.keys(data.servidores).length) {
+            let html = '';
+            const dataInicio = new Date(ano, mes - 1, 1).toLocaleDateString();
+            const dataFim = new Date(ano, mes, 0).toLocaleDateString();
+
+            Object.entries(data.servidores).forEach(([servidor, atividades]) => {
+                html += `
+                    <div class="relatorio-bloco mb-5" style="page-break-after: always;">
+                        <div class="relatorio-cabecalho">
+                            <h5 class="fw-bold text-center"><i class="bi bi-file-earmark-bar-graph"></i> Relatório Mensal</h5>
+                            <div class="text-center mb-2">
+                                <b>Servidor:</b> ${servidor}<br>
+                                <b>Período:</b> ${dataInicio} a ${dataFim}
+                            </div>
+                        </div>
+                        <table class="table table-bordered table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Atividade</th>
+                                    <th>Realizado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                atividades.forEach((item, idx) => {
+                    let dataBr = new Date(item.data).toLocaleDateString();
+                    html += `
+                        <tr>
+                            <td class="text-center">${dataBr}</td>
+                            <td>${item.atividade}</td>
+                            <td class="text-center">
+                                <label style="margin-right:10px;"><input type="radio" disabled> Sim</label>
+                                <label><input type="radio" disabled> Não</label>
+                            </td>
+                        </tr>
+                        <tr><td colspan="3" style="height:22px"></td></tr>
+                        <tr><td colspan="3" style="height:22px"></td></tr>
+                        <tr><td colspan="3" style="height:22px"></td></tr>
+                    `;
+                });
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<div class="alert alert-info">Nenhuma atividade encontrada para este mês.</div>`;
+        }
+    })
+    .catch(err => {
+        container.innerHTML = `<div class="alert alert-danger">Erro ao gerar relatório mensal!</div>`;
+    });
+}
+
+
+function imprimirRelatorio() {
+    // Garante que o relatório está visível
+    document.getElementById('resultadoRelatorio').style.display = '';
+    setTimeout(() => {
+        printDivConteudo('resultadoRelatorio');
+    }, 100);
+}
+
+
+function printDivConteudo(divId) {
+    var div = document.getElementById(divId);
+    if (!div) {
+        alert('Bloco não encontrado: ' + divId);
+        return;
+    }
+    var conteudo = div.innerHTML;
+    var style = `
+        <style>
+            body { margin: 2em; background: #fff; color: #000; font-family: Arial, sans-serif; }
+            .table { width: 100%; border-collapse: collapse; font-size: 1em; }
+            .table th, .table td { border: 1px solid #222; padding: 6px 10px; }
+            .table th { background: #eee; }
+            button, select, .form-label, .no-print, .btn, .titulo-sup-impressao, .painel-impressao-titulo {
+                display: none !important;
+            }
+            td label {
+                font-size: 1em;
+                font-weight: normal;
+            }
+            td input[type="radio"] {
+                transform: scale(1.1);
+                margin: 0 5px 0 0;
+            }
+            h4, h5 {
+                margin: 0.7em 0 0.4em 0;
+            }
+        </style>
+    `;
+    var win = window.open('', '', 'width=900,height=700');
+    win.document.write(`
+        <html>
+            <head>
+                <title>Impressão</title>
+                ${style}
+            </head>
+            <body>
+                ${conteudo}
+            </body>
+        </html>
+    `);
+    win.document.close();
+    win.onload = function() {
+        win.focus();
+        win.print();
+        setTimeout(function() { win.close(); }, 200);
+    };
+}
+
+function gerarRelatorioSemana() {
+    const semanaIdx = parseInt(document.getElementById('selectSemana').value);
+    if (isNaN(semanaIdx)) {
+        document.getElementById('resultadoProgramacao').innerHTML = `<div class="alert alert-danger">Erro: Nenhuma semana foi selecionada.</div>`;
+        return;
+    }
+
+    const unidade_id = 1;
+    const ano = anoAtualCalendario;
+    const mes = mesAtualCalendario;
+    const container = document.getElementById('resultadoRelatorio');
+    container.innerHTML = `<div class="text-center my-3"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
+
+    fetch(`/programacao/api/relatorio-semanal/?unidade_id=${unidade_id}&semana=${semanaIdx}&ano=${ano}&mes=${mes}`)
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.servidores && Object.keys(data.servidores).length > 0) {
+                let html = '';
+
+                Object.entries(data.servidores).forEach(([servidor, atividades]) => {
+                    html += `
+                        <div class="relatorio-bloco mb-5" style="page-break-after: always;">
+                            <div class="relatorio-cabecalho">
+                                <h5 class="fw-bold text-center"><i class="bi bi-file-earmark-text"></i> Relatório da Semana</h5>
+                                <div class="text-center mb-2"><b>Servidor:</b> ${servidor}</div>
+                            </div>
+                            <table class="table table-bordered table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Atividade</th>
+                                        <th>Realizado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    atividades.forEach(item => {
+                        const dataBr = item.data ? new Date(item.data).toLocaleDateString() : '-';
+                        html += `
+                            <tr>
+                                <td class="text-center">${dataBr}</td>
+                                <td>${item.atividade || '-'}</td>
+                                <td class="text-center">
+                                    <label style="margin-right:10px;"><input type="radio" disabled> Sim</label>
+                                    <label><input type="radio" disabled> Não</label>
+                                </td>
+                            </tr>
+                            <tr><td colspan="3" style="height:22px"></td></tr>
+                            <tr><td colspan="3" style="height:22px"></td></tr>
+                            <tr><td colspan="3" style="height:22px"></td></tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+
+                // 🧩 Agora adiciona também os descansos
+                carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes).then(descansoHtml => {
+                    container.innerHTML = html + descansoHtml;
+                });
+
+            } else {
+                container.innerHTML = `<div class="alert alert-info">Nenhuma atividade encontrada para esta semana.</div>`;
+            }
+        })
+        .catch(err => {
+            console.error("Erro ao gerar relatório semanal:", err);
+            container.innerHTML = `<div class="alert alert-danger">Erro ao gerar relatório!</div>`;
+        });
+}
+
+
+function carregarProgramacaoSemana() {
+    if (!anoAtualCalendario || !mesAtualCalendario) {
+        console.warn("⛔ anoAtualCalendario ou mesAtualCalendario ainda não foram definidos.");
+        return;
+    }
+    const semanaIdx = parseInt(document.getElementById('selectSemana').value);
+    const unidade_id = 1; // fixo até login
+
+    const ano = anoAtualCalendario;
+    const mes = mesAtualCalendario;
+
+    const nomes = ["Primeira", "Segunda", "Terceira", "Quarta", "Quinta", "Sexta"];
+    const semanas = semanasDoMes(ano, mes);
+    console.log("🗓️ Ano:", anoAtualCalendario, "| Mês:", mesAtualCalendario);
+    console.log("🔍 Índice da semana:", semanaIdx);
+    console.log("📅 Semanas calculadas:", semanas);
+    console.log("📆 Semana selecionada:", semanas[semanaIdx]);
+
+    const semana = semanas[semanaIdx];
+    const container = document.getElementById('resultadoProgramacao');
+
+    if (!semana || !semana.inicio || !semana.fim) {
+        console.error("❌ Semana inválida:", semana);
+        container.innerHTML = `<div class="alert alert-danger">Erro: Semana inválida selecionada.</div>`;
+        return;
+    }
+
+    let nomeSemana = nomes[semanaIdx];
+    const mesesExtenso = [
+        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+    ];
+    let nomeMes = mesesExtenso[semana.inicio.getMonth()];
+    let semanaLabel = `${nomeSemana} semana do mês de ${nomeMes}: ${semana.inicio.toLocaleDateString()} a ${semana.fim.toLocaleDateString()}`;
+
+    let cabecalhoHtml = `
+        <table class="table table-borderless text-center mb-0">
+            <tr>
+                <th colspan="2" style="font-size:1.4rem"><i class="bi bi-calendar-week"></i> Programação Semanal</th>
+            </tr>
+            <tr>
+                <td colspan="2" style="font-size:1rem">${semanaLabel}</td>
+            </tr>
+            <tr>
+                <td colspan="2" class="text-center">
+                    <b>Unidade:</b> Unidade Teste
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" class="text-center">
+                    <b><i class="bi bi-person-badge"></i> Supervisão:</b> {% if unidades and unidades.0.supervisao %}{{ unidades.0.supervisao }}{% else %}Sem supervisão{% endif %}
+                </td>
+            </tr>
+        </table>
+    `;
+    document.getElementById('cabecalhoProgramacao').innerHTML = cabecalhoHtml;
+
+    const url = `/programacao/api/programacao-semana/?unidade_id=${unidade_id}&semana=${semanaIdx}&ano=${ano}&mes=${mes}`;
+    container.innerHTML = `<div class="text-center my-3"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
+
+    fetch(url)
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.programacoes && Object.keys(data.programacoes).length) {
+                let html = `<table class="table table-bordered table-sm"><tbody>`;
+                Object.entries(data.programacoes)
+                    .sort(([dataA], [dataB]) => new Date(dataA.split('-').reverse().join('-')) - new Date(dataB.split('-').reverse().join('-')))
+                    .forEach(([dataStr, atividades]) => {
+                        let dt = new Date(dataStr);
+                        let diaSemana = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
+                        diaSemana = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+                        let dataExt = dt.toLocaleDateString();
+
+                        html += `<tr class="bg-light fw-bold">
+                            <td class="text-center" colspan="4" style="font-size:1.15em">${diaSemana}, ${dataExt}</td>
+                        </tr>
+                        <tr>
+                            <th style="width: 160px;" class="text-center">Atividade</th>
+                            <th class="text-center">Servidores</th>
+                            <th class="text-center">Veículo</th>
+                            <th class="text-center">
+                                Realizado<br>
+                                <span style="font-size:0.85em;">
+                                    <span style="margin-right:18px;">Sim</span>Não
+                                </span>
+                            </th>
+                        </tr>`;
+
+                        let exp_idx = atividades.findIndex(a => (a.atividade || '').toLowerCase().includes("expediente administrativo"));
+                        if (exp_idx !== -1) {
+                            let item = atividades.splice(exp_idx, 1)[0];
+                            html += `
+                            <tr>
+                                <td class="text-center"><b>${item.atividade || ''}</b></td>
+                                <td class="text-center">${item.servidores ? item.servidores.join(', ') : ''}</td>
+                                <td class="text-center">${item.veiculo || ''}</td>
+                                <td class="text-center">
+                                    <div class="d-flex flex-row justify-content-center gap-2">
+                                        <label style="font-weight: normal; margin-right: 8px;">
+                                            <input type="radio" name="realizado_${dataStr}_exp" disabled>
+                                        </label>
+                                        <label style="font-weight: normal;">
+                                            <input type="radio" name="realizado_${dataStr}_exp" disabled>
+                                        </label>
+                                    </div>
+                                </td>
+                            </tr>`;
+                        }
+
+                        atividades.forEach((item, i) => {
+                            html += `
+                            <tr>
+                                <td class="text-center"><b>${item.atividade || ''}</b></td>
+                                <td class="text-center">${item.servidores ? item.servidores.join(', ') : ''}</td>
+                                <td class="text-center">${item.veiculo || ''}</td>
+                                <td class="text-center">
+                                    <div class="d-flex flex-row justify-content-center gap-2">
+                                        <label style="font-weight: normal; margin-right: 8px;">
+                                            <input type="radio" name="realizado_${dataStr}_${i}" disabled>
+                                        </label>
+                                        <label style="font-weight: normal;">
+                                            <input type="radio" name="realizado_${dataStr}_${i}" disabled>
+                                        </label>
+                                    </div>
+                                </td>
+                            </tr>`;
+                        });
+                    });
+                html += `</tbody></table>`;
+                container.innerHTML = html;
+                carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes).then(descansoHtml => {
+                        container.innerHTML += descansoHtml;
+                    });
+            } else {
+                container.innerHTML = `<div class="alert alert-info">Nenhuma programação encontrada para esta semana.</div>`;
+            }
+        })
+        .catch(err => {
+            console.error("Erro ao buscar programação:", err);
+            container.innerHTML = `<div class="alert alert-danger">Erro ao buscar programação!</div>`;
+        });
+}
+
+
+function carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes) {
+  return fetch(`/descanso/api/descansos-semana/?unidade_id=${unidade_id}&semana=${semanaIdx}&ano=${ano}&mes=${mes}`)
+    .then(resp => resp.json())
+    .then(descansos => {
+      if (!descansos || descansos.length === 0) return '';
+      return `
+        <div class="mt-4">
+          <h6 class="text-warning fw-bold text-center">
+            <i class="bi bi-moon"></i> Servidores em Descanso/Folga na Semana
+          </h6>
+          <table class="table table-warning table-sm table-bordered">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Tipo de Descanso</th>
+                <th>Período</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${descansos.map(d => {
+                // converte data de ISO para dd/mm/aaaa
+                const ini = new Date(d.data_inicio).toLocaleDateString('pt-BR');
+                const fim = new Date(d.data_fim).toLocaleDateString('pt-BR');
+                return `<tr><td>${d.nome}</td><td>${d.tipo_descanso}</td><td>${ini} a ${fim}</td></tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    })
+    .catch(err => {
+      console.error("Erro ao buscar descansos da semana:", err);
+      return '';
+    });
+}
+
+function carregarBlocoDescansoMensal(unidade_id, ano, mes) {
+  return fetch(`/descanso/api/descansos-mes/?unidade_id=${unidade_id}&ano=${ano}&mes=${mes}`)
+    .then(resp => resp.json())
+    .then(descansos => {
+      if (!descansos || descansos.length === 0) return '';
+      return `
+        <div class="mt-4">
+          <h6 class="text-warning fw-bold text-center">
+            <i class="bi bi-moon"></i> Servidores em Descanso/Folga no Mês
+          </h6>
+          <table class="table table-warning table-sm table-bordered">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Tipo de Descanso</th>
+                <th>Período</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${descansos.map(d => {
+                const ini = new Date(d.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR');
+                const fim = new Date(d.data_fim + 'T00:00:00').toLocaleDateString('pt-BR');
+                return `
+                  <tr>
+                    <td>${d.nome}</td>
+                    <td>${d.tipo_descanso}</td>
+                    <td>${ini} a ${fim}</td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    })
+    .catch(err => {
+      console.error("Erro ao buscar descansos do mês:", err);
+      return '';
+    });
+}
+
+
+function mostrarBloco(tipo) {
+    document.getElementById('resultadoProgramacao').style.display = (tipo === 'programacao') ? '' : 'none';
+    document.getElementById('resultadoRelatorio').style.display = (tipo === 'relatorio') ? '' : 'none';
+}
+// Imprimir só o bloco da programação semanal
+
+
+</script>
+
+<style>
+.shadow-sm { box-shadow: 0 2px 8px rgba(60,60,60,.06); }
+.bg-white { background: #fff; }
+
+
+
+</style>
+<script>
+window.onload = function() {
+    popularSelectMes();
+    mostrarBloco('programacao');
+
+    // Aguarda popularSelectMes() terminar e setar ano/mes para popular as semanas
+    setTimeout(() => {
+        if (anoAtualCalendario && mesAtualCalendario) {
+            popularSelectSemana(anoAtualCalendario, mesAtualCalendario);
+            
+            // Aguarda o selectSemana ser preenchido antes de tentar carregar
+            setTimeout(() => {
+                carregarProgramacaoSemana();
+            }, 200);
+        }
+    }, 300);
+}
+</script>
+<!-- FIM: SCRIPTS DO PAINEL DE PROGRAMAÇÃO -->
