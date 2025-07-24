@@ -101,7 +101,8 @@
         </div>
     </div>
     </div>
-    <!-- Modal de edição abaixo do modalSalvarPlantao -->
+
+    <!-- Modal de edição -->
     <div class="modal fade" id="modalEditarPlantao" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -111,7 +112,6 @@
         </div>
         <div class="modal-body">
             <input type="text" id="editNomePlantao" class="form-control mb-2" placeholder="Nome">
-            <!-- Será preenchido com a grade de escala dinamicamente -->
             <div id="editEscalaContainer"></div>
         </div>
         <div class="modal-footer">
@@ -122,6 +122,14 @@
     </div>
     </div>
 
+    <!-- ✅ Toast de Confirmação (fora dos modais, para uso global) -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    <div id="toastConfirmacao" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+        <div class="toast-body" id="toastMensagem">Ação concluída com sucesso!</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -438,7 +446,7 @@ document.getElementById('confirmarSalvarPlantao').onclick = () => {
     const payload = {
         nome: nome,
         data_inicio: semanasGeradas[0][0].toISOString().split('T')[0],
-        data_fim: semanasGeradas[semanasGeradas.length-1][1].toISOString().split('T')[0],
+        data_fim: semanasGeradas[semanasGeradas.length - 1][1].toISOString().split('T')[0],
         escala: semanasGeradas.map((semana, idx) => ({
             servidor_id: escalaServidoresSelecionados[idx],
             semana_inicio: semana[0].toISOString().split('T')[0],
@@ -448,23 +456,23 @@ document.getElementById('confirmarSalvarPlantao').onclick = () => {
 
     fetch("/plantao/salvar/", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
         body: JSON.stringify(payload)
     })
     .then(resp => resp.json())
-   
     .then(data => {
         if (data.success) {
-            alert("✅ Plantão salvo com sucesso!");
-            modalSalvar.hide();
+            modalSalvar.hide(); // 👈 isso fecha o modal
+            mostrarToast("✅ Plantão salvo com sucesso!");
+            carregarPlantoesSalvos(); // opcional: recarrega a lista
         } else {
-            console.error("Erro no backend:", data.error);
-            console.error(data.trace);
             alert("Erro ao salvar plantão:\n" + data.error);
         }
-    })
+    });
 };
-
 function getCSRFToken() {
     return document.cookie.split('; ')
         .find(row => row.startsWith('csrftoken='))
@@ -592,8 +600,12 @@ function excluirPlantao(id) {
   })
     .then(r => r.json())
     .then(resp => {
-      if (resp.success) loadPlantoes();
-      else alert('Erro ao excluir: ' + resp.error);
+      if (resp.success) {
+        mostrarToast("🗑️ Plantão excluído com sucesso!");
+        carregarPlantoesSalvos();
+      } else {
+        alert('Erro ao excluir: ' + resp.error);
+      }
     });
 }
 
@@ -649,7 +661,9 @@ function imprimirPlantao(id) {
               };
               window.onafterprint = () => window.close();
             </` + `script>
-          </body>
+          
+           
+            </body>
         </html>`;
 
       const printWindow = window.open('', '_blank');
@@ -664,6 +678,14 @@ function imprimirPlantao(id) {
 }
 
 // Chame isso no fim do script, depois de carregar a lista
+function mostrarToast(msg, tipo = 'success') {
+    const toastEl = document.getElementById('toastConfirmacao');
+    const toastMsg = document.getElementById('toastMensagem');
+    toastEl.className = `toast align-items-center text-white bg-${tipo} border-0`;
+    toastMsg.textContent = msg;
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+}
 carregarPlantoesSalvos();
 </script>
 {% endblock %}

@@ -22,7 +22,6 @@ def salvar_plantao(request):
         return JsonResponse({'success': False, 'error': 'Método inválido'}, status=405)
 
     try:
-        # Parse do payload
         data = json.loads(request.body)
         nome = data.get('nome')
         data_inicio = data.get('data_inicio')
@@ -30,11 +29,9 @@ def salvar_plantao(request):
         escala = data.get('escala', [])
         unidade_id = 1
 
-        # Verificação de campos obrigatórios
         if not (nome and data_inicio and data_fim and escala):
             return JsonResponse({'success': False, 'error': 'Dados incompletos'}, status=400)
 
-        # 🔒 Verifica se já existe um plantão no mesmo intervalo
         conflitos = supabase.table("plantoes") \
             .select("id, nome, data_inicio, data_fim") \
             .or_(f"data_inicio.lte.{data_fim},data_fim.gte.{data_inicio}") \
@@ -47,7 +44,6 @@ def salvar_plantao(request):
                 'error': f"Período informado conflita com os plantões: {nomes_conflitantes}"
             }, status=400)
 
-        # 🧾 Insere o plantão principal
         response = supabase.table("plantoes").insert([{
             "nome": nome,
             "data_inicio": data_inicio,
@@ -60,19 +56,16 @@ def salvar_plantao(request):
 
         plantao_id = response.data[0]['id']
 
-        # 📅 Insere as escalas da semana
-        
         for item in escala:
             servidor_id = item.get('servidor_id')
             semana_inicio = item.get('semana_inicio')
             semana_fim = item.get('semana_fim')
 
             if not servidor_id or not semana_inicio or not semana_fim:
-                continue  # pula se faltando info
+                continue
 
-            # Calcula nome da semana baseado no índice (ex: 1ª, 2ª, etc.)
             semana_dt = datetime.strptime(semana_inicio, "%Y-%m-%d")
-            semana_idx = (semana_dt.day - 1) // 7  # 0 para 1ª semana, 1 para 2ª...
+            semana_idx = (semana_dt.day - 1) // 7
             nome_da_semana = [
                 "Primeira semana", "Segunda semana", "Terceira semana",
                 "Quarta semana", "Quinta semana", "Sexta semana"
@@ -89,16 +82,17 @@ def salvar_plantao(request):
             if not escala_result.data:
                 raise Exception("Erro ao salvar uma semana da escala.")
 
-                return JsonResponse({'success': True, 'plantao_id': plantao_id})
+        # ✅ AGORA FORA DO LOOP
+        return JsonResponse({'success': True, 'plantao_id': plantao_id})
 
     except Exception as e:
-                print("[ERRO AO SALVAR PLANTÃO]", str(e))
-                traceback.print_exc()
-                return JsonResponse({
-                    'success': False,
-                    'error': str(e),
-                    'trace': traceback.format_exc()
-                })
+        print("[ERRO AO SALVAR PLANTÃO]", str(e))
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'trace': traceback.format_exc()
+        })
 @require_GET
 def listar_plantoes(request):
     try:
