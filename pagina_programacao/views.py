@@ -16,6 +16,8 @@ def pagina_programacao(request):
     return render(request, 'pagina_programacao.html')
 
 
+
+
 @csrf_exempt
 def salvar_programacao(request):
     if request.method == 'POST':
@@ -215,18 +217,15 @@ def api_programacao_semana(request):
 
             semanas = get_semanas_do_mes(ano, mes)
 
-            print("📅 Ano:", ano)
-            print("📆 Mês:", mes)
-            print("🔢 semana_idx:", semana_idx)
-            print("🧮 Total de semanas calculadas:", len(semanas))
-            print("🗓️ Semanas calculadas:", semanas)
+            print(f"📅 Ano: {ano} | Mês: {mes} | Semana índice: {semana_idx}")
+            print(f"🗓️ Semanas calculadas: {semanas}")
 
             if not semanas or semana_idx < 0 or semana_idx >= len(semanas):
                 return JsonResponse({"erro": "Semana inválida selecionada."}, status=400)
 
             semana_inicio, semana_fim = semanas[semana_idx]
 
-            # 1. Busca programações
+            # 1. Programações
             programacoes = supabase.table("programacoes")\
                 .select("*, atividade:atividade_id(nome), veiculo:veiculo_id(placa,modelo)")\
                 .eq("unidade_id", unidade_id)\
@@ -234,7 +233,7 @@ def api_programacao_semana(request):
                 .lte("data", semana_fim.isoformat())\
                 .execute().data
 
-            # 2. Busca alocações da semana (com servidores)
+            # 2. Alocações
             alocacoes = supabase.table("alocacoes")\
                 .select("programacao_id, servidor:servidor_id(nome)")\
                 .eq("unidade_id", unidade_id)\
@@ -242,13 +241,14 @@ def api_programacao_semana(request):
                 .lte("data", semana_fim.isoformat())\
                 .execute().data
 
-            # 3. Indexa servidores por programação
+            # 3. Servidores indexados por programação
             servidores_por_programacao = defaultdict(list)
             for aloc in alocacoes:
-                if aloc.get("programacao_id") and aloc.get("servidor", {}).get("nome"):
-                    servidores_por_programacao[aloc["programacao_id"]].append(aloc["servidor"]["nome"])
+                nome = aloc.get("servidor", {}).get("nome")
+                if aloc.get("programacao_id") and nome:
+                    servidores_por_programacao[aloc["programacao_id"]].append(nome)
 
-            # 4. AGRUPA POR DATA e monta output
+            # 4. Organiza atividades por data
             result = defaultdict(list)
             for p in programacoes:
                 data_str = p["data"]
@@ -256,9 +256,10 @@ def api_programacao_semana(request):
                 atividade_nome = p.get("atividade", {}).get("nome", p.get("atividade_id", ""))
                 veiculo_nome = ""
                 if p.get("veiculo"):
-                    veiculo_nome = f"{p['veiculo'].get('placa','')}"
-                    if p['veiculo'].get('modelo'):
-                        veiculo_nome += " - " + p['veiculo']['modelo']
+                    veiculo_nome = p["veiculo"].get("placa", "")
+                    modelo = p["veiculo"].get("modelo")
+                    if modelo:
+                        veiculo_nome += f" - {modelo}"
                 result[data_str].append({
                     "atividade": atividade_nome,
                     "servidores": servidores_por_programacao.get(prog_id, []),
@@ -266,60 +267,128 @@ def api_programacao_semana(request):
                     "descricao": p.get("descricao", "")
                 })
 
-            return JsonResponse({"programacoes": result})
+            # 5. Buscar plantonista da semana
+            plantonista_nome = None
+            try:
+                escalas = supabase.table("escala_plantao")\
+                    .select("*, servidor:servidor_id(nome), plantao:plantao_id(unidade_id)")\
+                    .or_(f"semana_inicio.lte.{semana_fim.isoformat()},semana_fim.gte.{semana_inicio.isoformat()}")\
+                    .execute().data
+
+                print(f"🔍 Escalas encontradas: {len(escalas)}")
+
+                
+                for escala in escalas:
+                    plantao = escala.get("plantao")
+                    if not plantao or plantao.get("unidade_id") != unidade_id:
+                        continue
+
+                    inicio = escala.get("semana_inicio")
+                    fim = escala.get("semana_fim")
+
+                    if inicio and fim:
+                        # Verifica se há sobreposição entre as semanas
+                        if not (semana_fim < date.fromisoformat(inicio) or semana_inicio > date.fromisoformat(fim)):
+                            nome_servidor = escala.get("servidor", {}).get("nome")
+                            if nome_servidor:
+                                plantonista_nome = nome_servidor.strip().title()
+                                break
+
+            except Exception as e:
+                print("⚠️ Erro ao buscar escalas:", str(e))
+
+            return JsonResponse({
+                "programacoes": result,
+                "plantonista": plantonista_nome
+            })
 
         except Exception as e:
             print("❌ Erro interno:", str(e))
             return JsonResponse({"erro": "Erro interno ao processar a semana"}, status=500)
+
+
+            
 @csrf_exempt
 def api_relatorio_semanal(request):
-    if request.method == "GET":
+    if request.method != "GET":
+        return JsonResponse({"erro": "Método não permitido"}, status=405)
+
+    try:
         unidade_id = int(request.GET.get('unidade_id', 1))
         semana_idx = int(request.GET.get('semana', 0))
         ano = int(request.GET.get('ano', date.today().year))
         mes = int(request.GET.get('mes', date.today().month))
 
         semanas = get_semanas_do_mes(ano, mes)
-        if not semanas or semana_idx >= len(semanas):
+        if not semanas or semana_idx < 0 or semana_idx >= len(semanas):
             return JsonResponse({"erro": "Semana inválida"}, status=400)
+
         semana_inicio, semana_fim = semanas[semana_idx]
 
-        # Busca as alocações da semana, exceto Expediente Administrativo
-        alocacoes = supabase.table("alocacoes") \
-            .select("data, atividade:atividade_id(nome), servidor:servidor_id(nome)") \
-            .eq("unidade_id", unidade_id) \
-            .gte("data", semana_inicio.isoformat()) \
-            .lte("data", semana_fim.isoformat()) \
+        # 🎯 Coleta as alocações da semana
+        alocacoes = supabase.table("alocacoes")\
+            .select("data, atividade:atividade_id(nome), servidor:servidor_id(nome)")\
+            .eq("unidade_id", unidade_id)\
+            .gte("data", semana_inicio.isoformat())\
+            .lte("data", semana_fim.isoformat())\
             .execute().data
 
         servidores = defaultdict(list)
+
         for aloc in alocacoes:
             atividade_nome = (aloc.get("atividade") or {}).get("nome", "")
             if atividade_nome.lower().strip() == "expediente administrativo":
                 continue
+
             servidor_nome = (aloc.get("servidor") or {}).get("nome", "")
             if not servidor_nome:
                 continue
+
             servidores[servidor_nome].append({
                 "data": aloc.get("data"),
                 "atividade": atividade_nome,
             })
 
-        return JsonResponse({"servidores": servidores})
+        # 🛡️ Busca do plantonista exato pela data da semana
+        plantonista_nome = None
+        try:
+            escala = supabase.table("escala_plantao")\
+                .select("*, servidor:servidor_id(nome), plantao:plantao_id(unidade_id)")\
+                .eq("semana_inicio", semana_inicio.isoformat())\
+                .eq("semana_fim", semana_fim.isoformat())\
+                .execute().data
 
+            for item in escala:
+                if item.get("plantao", {}).get("unidade_id") == unidade_id:
+                    nome = item.get("servidor", {}).get("nome")
+                    if nome:
+                        plantonista_nome = nome.strip().title()
+                        break
+        except Exception as e:
+            print("⚠️ Erro ao buscar plantonista:", str(e))
+
+        return JsonResponse({
+            "servidores": servidores,
+            "plantonista": plantonista_nome
+        })
+
+    except Exception as e:
+        print("❌ Erro interno:", str(e))
+        return JsonResponse({"erro": "Erro ao processar relatório semanal"}, status=500)
 @csrf_exempt
 def api_programacao_mes(request):
-    if request.method == "GET":
+    if request.method != "GET":
+        return JsonResponse({"erro": "Método não permitido"}, status=405)
+
+    try:
         unidade_id = int(request.GET.get('unidade_id', 1))
         ano = int(request.GET.get('ano', date.today().year))
         mes = int(request.GET.get('mes', date.today().month))
 
-        # Pega o primeiro e último dia do mês
-        from calendar import monthrange
         dia_inicio = date(ano, mes, 1)
         dia_fim = date(ano, mes, monthrange(ano, mes)[1])
 
-        # 1. Busca programações do mês inteiro
+        # 1. Programações
         programacoes = supabase.table("programacoes")\
             .select("*, atividade:atividade_id(nome), veiculo:veiculo_id(placa,modelo)")\
             .eq("unidade_id", unidade_id)\
@@ -327,7 +396,7 @@ def api_programacao_mes(request):
             .lte("data", dia_fim.isoformat())\
             .execute().data
 
-        # 2. Busca alocações do mês inteiro
+        # 2. Alocações
         alocacoes = supabase.table("alocacoes")\
             .select("programacao_id, servidor:servidor_id(nome)")\
             .eq("unidade_id", unidade_id)\
@@ -335,13 +404,14 @@ def api_programacao_mes(request):
             .lte("data", dia_fim.isoformat())\
             .execute().data
 
-        # 3. Indexa servidores por programação
+        # 3. Servidores por programação
         servidores_por_programacao = defaultdict(list)
         for aloc in alocacoes:
-            if aloc.get("programacao_id") and aloc.get("servidor", {}).get("nome"):
-                servidores_por_programacao[aloc["programacao_id"]].append(aloc["servidor"]["nome"])
+            nome = aloc.get("servidor", {}).get("nome")
+            if aloc.get("programacao_id") and nome:
+                servidores_por_programacao[aloc["programacao_id"]].append(nome)
 
-        # 4. AGRUPA POR DATA e monta output
+        # 4. Agrupa por data
         result = defaultdict(list)
         for p in programacoes:
             data_str = p["data"]
@@ -349,17 +419,22 @@ def api_programacao_mes(request):
             atividade_nome = p.get("atividade", {}).get("nome", p.get("atividade_id", ""))
             veiculo_nome = ""
             if p.get("veiculo"):
-                veiculo_nome = f"{p['veiculo'].get('placa','')}"
-                if p['veiculo'].get('modelo'):
-                    veiculo_nome += " - " + p['veiculo']['modelo']
+                veiculo_nome = p["veiculo"].get("placa", "")
+                modelo = p["veiculo"].get("modelo")
+                if modelo:
+                    veiculo_nome += f" - {modelo}"
             result[data_str].append({
                 "atividade": atividade_nome,
                 "servidores": servidores_por_programacao.get(prog_id, []),
                 "veiculo": veiculo_nome,
                 "descricao": p.get("descricao", "")
             })
+
         return JsonResponse({"programacoes": result})
-    return JsonResponse({"erro": "Método não permitido"}, status=405)
+
+    except Exception as e:
+        return JsonResponse({"erro": str(e)}, status=500)
+    
 
 def api_programacao_meses_disponiveis(request):
     unidade_id = int(request.GET.get('unidade_id', 1))
@@ -389,15 +464,21 @@ def api_programacao_meses_disponiveis(request):
     return JsonResponse(meses_labels, safe=False)
 @csrf_exempt
 def api_relatorio_mensal(request):
-    if request.method == "GET":
+    if request.method != "GET":
+        return JsonResponse({"erro": "Método não permitido"}, status=405)
+
+    try:
         unidade_id = int(request.GET.get('unidade_id', 1))
         ano = int(request.GET.get('ano', date.today().year))
         mes = int(request.GET.get('mes', date.today().month))
-        from calendar import monthrange
+
         dia_inicio = date(ano, mes, 1)
         dia_fim = date(ano, mes, monthrange(ano, mes)[1])
 
-        # Busca as alocações do mês, exceto Expediente Administrativo
+        # ⏱️ Semanas do mês
+        semanas = get_semanas_do_mes(ano, mes)
+
+        # 📊 Alocações do mês
         alocacoes = supabase.table("alocacoes") \
             .select("data, atividade:atividade_id(nome), servidor:servidor_id(nome)") \
             .eq("unidade_id", unidade_id) \
@@ -418,9 +499,16 @@ def api_relatorio_mensal(request):
                 "atividade": atividade_nome,
             })
 
-        return JsonResponse({"servidores": servidores})
+        # 🔍 Buscar plantonistas por semana
 
-    return JsonResponse({"erro": "Método não permitido"}, status=405)
+
+        return JsonResponse({
+            "servidores": servidores,
+          
+        })
+
+    except Exception as e:
+        return JsonResponse({"erro": str(e)}, status=500)
 
 def relatorio_semanal(request):
     # Sua lógica aqui

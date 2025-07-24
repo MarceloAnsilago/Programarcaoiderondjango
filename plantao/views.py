@@ -6,7 +6,7 @@ from django.shortcuts import render
 from supabase import create_client
 from django.views.decorators.http import require_GET
 from django.views.decorators.http import require_http_methods
-
+from datetime import datetime
 # Configurações do Supabase
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"
@@ -61,6 +61,7 @@ def salvar_plantao(request):
         plantao_id = response.data[0]['id']
 
         # 📅 Insere as escalas da semana
+        
         for item in escala:
             servidor_id = item.get('servidor_id')
             semana_inicio = item.get('semana_inicio')
@@ -69,26 +70,35 @@ def salvar_plantao(request):
             if not servidor_id or not semana_inicio or not semana_fim:
                 continue  # pula se faltando info
 
+            # Calcula nome da semana baseado no índice (ex: 1ª, 2ª, etc.)
+            semana_dt = datetime.strptime(semana_inicio, "%Y-%m-%d")
+            semana_idx = (semana_dt.day - 1) // 7  # 0 para 1ª semana, 1 para 2ª...
+            nome_da_semana = [
+                "Primeira semana", "Segunda semana", "Terceira semana",
+                "Quarta semana", "Quinta semana", "Sexta semana"
+            ][semana_idx] if semana_idx < 6 else f"{semana_idx + 1}ª semana"
+
             escala_result = supabase.table("escala_plantao").insert([{
                 "plantao_id": plantao_id,
                 "servidor_id": servidor_id,
                 "semana_inicio": semana_inicio,
-                "semana_fim": semana_fim
+                "semana_fim": semana_fim,
+                "nome_da_semana": nome_da_semana
             }]).execute()
 
             if not escala_result.data:
                 raise Exception("Erro ao salvar uma semana da escala.")
 
-        return JsonResponse({'success': True, 'plantao_id': plantao_id})
+                return JsonResponse({'success': True, 'plantao_id': plantao_id})
 
     except Exception as e:
-        print("[ERRO AO SALVAR PLANTÃO]", str(e))
-        traceback.print_exc()
-        return JsonResponse({
-            'success': False,
-            'error': str(e),
-            'trace': traceback.format_exc()
-        })
+                print("[ERRO AO SALVAR PLANTÃO]", str(e))
+                traceback.print_exc()
+                return JsonResponse({
+                    'success': False,
+                    'error': str(e),
+                    'trace': traceback.format_exc()
+                })
 @require_GET
 def listar_plantoes(request):
     try:

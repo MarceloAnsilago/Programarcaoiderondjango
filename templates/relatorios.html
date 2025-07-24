@@ -221,7 +221,7 @@ function mostrarBlocoMensal(tipo) {
 
 function carregarProgramacaoMensal() {
     const unidade_id = 1;
-    const mes_ano = document.getElementById('selectMes').value; // "2025-07"
+    const mes_ano = document.getElementById('selectMes').value;
     const [ano, mes] = mes_ano.split('-');
     const container = document.getElementById('resultadoProgramacaoMensal');
     container.innerHTML = `<div class="text-center my-3"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
@@ -232,12 +232,8 @@ function carregarProgramacaoMensal() {
         if (data.programacoes && Object.keys(data.programacoes).length) {
             let cabecalhoMensal = `
                 <table class="table table-bordered text-center mb-0" style="margin-bottom:10px;">
-                    <tr>
-                        <th colspan="2" style="font-size:1.3rem; background:#eee;">Programação Mensal</th>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="font-size:1rem">Mês: ${("0"+mes).slice(-2)}/${ano}</td>
-                    </tr>
+                    <tr><th colspan="2" style="font-size:1.3rem; background:#eee;">Programação Mensal</th></tr>
+                    <tr><td colspan="2" style="font-size:1rem">Mês: ${("0"+mes).slice(-2)}/${ano}</td></tr>
                     <tr>
                         <td class="text-start"><b>Unidade:</b> Unidade Teste</td>
                         <td class="text-start"><b>Supervisão:</b> Sem supervisão</td>
@@ -269,49 +265,20 @@ function carregarProgramacaoMensal() {
                         </th>
                     </tr>`;
 
-                    let exp_idx = atividades.findIndex(a => (a.atividade || '').toLowerCase().includes("expediente administrativo"));
+                    const exp_idx = atividades.findIndex(a => (a.atividade || '').toLowerCase().includes("expediente administrativo"));
                     if (exp_idx !== -1) {
-                        let item = atividades.splice(exp_idx, 1)[0];
-                        html += `
-                        <tr>
-                            <td class="text-center"><b>${item.atividade || ''}</b></td>
-                            <td class="text-center">${item.servidores ? item.servidores.join(', ') : ''}</td>
-                            <td class="text-center">${item.veiculo || ''}</td>
-                            <td class="text-center">
-                                <div class="d-flex flex-row justify-content-center gap-2">
-                                    <label style="font-weight: normal; margin-right: 8px;">
-                                        <input type="radio" disabled>
-                                    </label>
-                                    <label style="font-weight: normal;">
-                                        <input type="radio" disabled>
-                                    </label>
-                                </div>
-                            </td>
-                        </tr>`;
+                        const item = atividades.splice(exp_idx, 1)[0];
+                        html += gerarLinhaAtividade(item);
                     }
-                    atividades.forEach((item, i) => {
-                        html += `
-                        <tr>
-                            <td class="text-center"><b>${item.atividade || ''}</b></td>
-                            <td class="text-center">${item.servidores ? item.servidores.join(', ') : ''}</td>
-                            <td class="text-center">${item.veiculo || ''}</td>
-                            <td class="text-center">
-                                <div class="d-flex flex-row justify-content-center gap-2">
-                                    <label style="font-weight: normal; margin-right: 8px;">
-                                        <input type="radio" disabled>
-                                    </label>
-                                    <label style="font-weight: normal;">
-                                        <input type="radio" disabled>
-                                    </label>
-                                </div>
-                            </td>
-                        </tr>`;
+
+                    atividades.forEach(item => {
+                        html += gerarLinhaAtividade(item);
                     });
                 });
+
             html += `</tbody></table>`;
             container.innerHTML = cabecalhoMensal + html;
 
-            // Agora adiciona os descansos do mês
             carregarBlocoDescansoMensal(unidade_id, ano, mes).then(descansoHtml => {
                 container.innerHTML += descansoHtml;
             });
@@ -325,73 +292,100 @@ function carregarProgramacaoMensal() {
     });
 }
 
+function gerarLinhaAtividade(item) {
+    return `
+        <tr>
+            <td class="text-center"><b>${item.atividade || ''}</b></td>
+            <td class="text-center">${item.servidores ? item.servidores.join(', ') : ''}</td>
+            <td class="text-center">${item.veiculo || ''}</td>
+            <td class="text-center">
+                <div class="d-flex flex-row justify-content-center gap-2">
+                    <label style="font-weight: normal; margin-right: 8px;">
+                        <input type="radio" disabled>
+                    </label>
+                    <label style="font-weight: normal;">
+                        <input type="radio" disabled>
+                    </label>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
 function gerarRelatorioMensal() {
     const unidade_id = 1;
-    const mes_ano = document.getElementById('selectMes').value; // "2025-07"
+    const mes_ano = document.getElementById('selectMes').value;
     const [ano, mes] = mes_ano.split('-');
     const container = document.getElementById('resultadoRelatorioMensal');
+
     container.innerHTML = `<div class="text-center my-3"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
 
     fetch(`/programacao/api/relatorio-mensal/?unidade_id=${unidade_id}&ano=${ano}&mes=${mes}`)
-    .then(resp => resp.json())
-    .then(data => {
-        if (data.servidores && Object.keys(data.servidores).length) {
-            let html = '';
-            const dataInicio = new Date(ano, mes - 1, 1).toLocaleDateString();
-            const dataFim = new Date(ano, mes, 0).toLocaleDateString();
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.servidores && Object.keys(data.servidores).length) {
+                let html = '';
+                const dataInicio = new Date(ano, mes - 1, 1).toLocaleDateString();
+                const dataFim = new Date(ano, mes, 0).toLocaleDateString();
 
-            Object.entries(data.servidores).forEach(([servidor, atividades]) => {
-                html += `
-                    <div class="relatorio-bloco mb-5" style="page-break-after: always;">
-                        <div class="relatorio-cabecalho">
-                            <h5 class="fw-bold text-center"><i class="bi bi-file-earmark-bar-graph"></i> Relatório Mensal</h5>
-                            <div class="text-center mb-2">
-                                <b>Servidor:</b> ${servidor}<br>
-                                <b>Período:</b> ${dataInicio} a ${dataFim}
-                            </div>
-                        </div>
-                        <table class="table table-bordered table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Data</th>
-                                    <th>Atividade</th>
-                                    <th>Realizado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                atividades.forEach((item, idx) => {
-                    let dataBr = new Date(item.data).toLocaleDateString();
+                Object.entries(data.servidores).forEach(([servidor, atividades]) => {
                     html += `
-                        <tr>
-                            <td class="text-center">${dataBr}</td>
-                            <td>${item.atividade}</td>
-                            <td class="text-center">
-                                <label style="margin-right:10px;"><input type="radio" disabled> Sim</label>
-                                <label><input type="radio" disabled> Não</label>
-                            </td>
-                        </tr>
-                        <tr><td colspan="3" style="height:22px"></td></tr>
-                        <tr><td colspan="3" style="height:22px"></td></tr>
-                        <tr><td colspan="3" style="height:22px"></td></tr>
+                        <div class="relatorio-bloco mb-5" style="page-break-after: always;">
+                            <div class="relatorio-cabecalho">
+                                <h5 class="fw-bold text-center"><i class="bi bi-file-earmark-bar-graph"></i> Relatório Mensal</h5>
+                                <div class="text-center mb-2">
+                                    <b>Servidor:</b> ${servidor}<br>
+                                    <b>Período:</b> ${dataInicio} a ${dataFim}
+                                </div>
+                            </div>
+                            <table class="table table-bordered table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Atividade</th>
+                                        <th>Realizado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    // Ordenar atividades por data
+                    atividades.sort((a, b) => new Date(a.data) - new Date(b.data));
+
+                    atividades.forEach((item) => {
+                        const dataBr = new Date(item.data).toLocaleDateString();
+                        html += `
+                            <tr>
+                                <td class="text-center">${dataBr}</td>
+                                <td>${item.atividade}</td>
+                                <td class="text-center">
+                                    <label style="margin-right:10px;"><input type="radio" disabled> Sim</label>
+                                    <label><input type="radio" disabled> Não</label>
+                                </td>
+                            </tr>
+                            <tr><td colspan="3" style="height:22px;"></td></tr>
+                            <tr><td colspan="3" style="height:22px;"></td></tr>
+                            <tr><td colspan="3" style="height:22px;"></td></tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
                     `;
                 });
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        } else {
-            container.innerHTML = `<div class="alert alert-info">Nenhuma atividade encontrada para este mês.</div>`;
-        }
-    })
-    .catch(err => {
-        container.innerHTML = `<div class="alert alert-danger">Erro ao gerar relatório mensal!</div>`;
-    });
-}
 
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `<div class="alert alert-info">Nenhuma atividade encontrada para este mês.</div>`;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            container.innerHTML = `<div class="alert alert-danger">Erro ao gerar relatório mensal!</div>`;
+        });
+}
 
 function imprimirRelatorio() {
     // Garante que o relatório está visível
@@ -452,9 +446,12 @@ function printDivConteudo(divId) {
 }
 
 function gerarRelatorioSemana() {
+    console.log("🔥 Disparou gerarRelatorioSemana");
+
     const semanaIdx = parseInt(document.getElementById('selectSemana').value);
     if (isNaN(semanaIdx)) {
-        document.getElementById('resultadoProgramacao').innerHTML = `<div class="alert alert-danger">Erro: Nenhuma semana foi selecionada.</div>`;
+        document.getElementById('resultadoProgramacao').innerHTML = `
+            <div class="alert alert-danger">Erro: Nenhuma semana foi selecionada.</div>`;
         return;
     }
 
@@ -462,7 +459,11 @@ function gerarRelatorioSemana() {
     const ano = anoAtualCalendario;
     const mes = mesAtualCalendario;
     const container = document.getElementById('resultadoRelatorio');
-    container.innerHTML = `<div class="text-center my-3"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
+
+    container.innerHTML = `
+        <div class="text-center my-3">
+            <span class="spinner-border spinner-border-sm"></span> Carregando...
+        </div>`;
 
     fetch(`/programacao/api/relatorio-semanal/?unidade_id=${unidade_id}&semana=${semanaIdx}&ano=${ano}&mes=${mes}`)
         .then(resp => resp.json())
@@ -470,6 +471,7 @@ function gerarRelatorioSemana() {
             if (data.servidores && Object.keys(data.servidores).length > 0) {
                 let html = '';
 
+                // 🧾 Relatório por servidor
                 Object.entries(data.servidores).forEach(([servidor, atividades]) => {
                     html += `
                         <div class="relatorio-bloco mb-5" style="page-break-after: always;">
@@ -512,13 +514,28 @@ function gerarRelatorioSemana() {
                     `;
                 });
 
-                // 🧩 Agora adiciona também os descansos
+                container.innerHTML = html;
+
+                // ➕ Mostra o plantonista abaixo dos relatórios
+                if (data.plantonista) {
+                    const blocoPlantonista = `
+                        <div class="mt-4 text-center">
+                            <div class="alert alert-info fw-bold" style="font-size:1.1em;">
+                                🛡️ <span class="me-2">Plantonista da Semana:</span> ${data.plantonista}
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += blocoPlantonista;
+                }
+
+                // ➕ Depois de tudo, adicionar descanso
                 carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes).then(descansoHtml => {
-                    container.innerHTML = html + descansoHtml;
+                    container.innerHTML += descansoHtml;
                 });
 
             } else {
-                container.innerHTML = `<div class="alert alert-info">Nenhuma atividade encontrada para esta semana.</div>`;
+                container.innerHTML = `
+                    <div class="alert alert-info">Nenhuma atividade encontrada para esta semana.</div>`;
             }
         })
         .catch(err => {
@@ -526,6 +543,7 @@ function gerarRelatorioSemana() {
             container.innerHTML = `<div class="alert alert-danger">Erro ao gerar relatório!</div>`;
         });
 }
+
 
 
 function carregarProgramacaoSemana() {
@@ -541,16 +559,13 @@ function carregarProgramacaoSemana() {
 
     const nomes = ["Primeira", "Segunda", "Terceira", "Quarta", "Quinta", "Sexta"];
     const semanas = semanasDoMes(ano, mes);
-    console.log("🗓️ Ano:", anoAtualCalendario, "| Mês:", mesAtualCalendario);
-    console.log("🔍 Índice da semana:", semanaIdx);
-    console.log("📅 Semanas calculadas:", semanas);
-    console.log("📆 Semana selecionada:", semanas[semanaIdx]);
+
 
     const semana = semanas[semanaIdx];
     const container = document.getElementById('resultadoProgramacao');
 
     if (!semana || !semana.inicio || !semana.fim) {
-        console.error("❌ Semana inválida:", semana);
+      
         container.innerHTML = `<div class="alert alert-danger">Erro: Semana inválida selecionada.</div>`;
         return;
     }
@@ -658,9 +673,29 @@ function carregarProgramacaoSemana() {
                     });
                 html += `</tbody></table>`;
                 container.innerHTML = html;
+
+                // 👉 Mostra o PLANTONISTA antes dos descansos
+                if (data.plantonista) {
+                    container.innerHTML += `
+                        <hr style="margin-top: 0; margin-bottom: 20px; border-color: #ccc;">
+                        <div class="alert alert-info text-center mt-4 mb-2" style="font-size: 1.1rem;">
+                            🛡️ <strong>Plantonista da Semana:</strong> ${data.plantonista}
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML += `
+                        
+                        <div class="alert alert-warning text-center mt-4 mb-2" style="font-size: 1.1rem;">
+                            🛡️ Nenhum plantonista cadastrado para esta semana.
+                        </div>
+                       
+                    `;
+                }
+
                 carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes).then(descansoHtml => {
-                        container.innerHTML += descansoHtml;
-                    });
+                    container.innerHTML += descansoHtml;
+                });
+
             } else {
                 container.innerHTML = `<div class="alert alert-info">Nenhuma programação encontrada para esta semana.</div>`;
             }
