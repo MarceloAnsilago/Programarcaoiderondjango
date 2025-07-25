@@ -24,6 +24,7 @@
         </div>
     </form>
     <div id="calendar" class="mt-4"></div>
+
 </div>
 {% include "relatorios.html" %}
 {% include "modal_programar_atividade.html" %}
@@ -213,6 +214,7 @@ document.addEventListener("DOMContentLoaded", function() {
    
     
     function prepararModalProgramarAtividade(alocacoes = []) {
+
         const cardsDiv = document.getElementById('cardsContainer');
         cardsDiv.innerHTML = '';
 
@@ -242,6 +244,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
             if (isExpediente) {
                 card.id = "expediente";
+                console.log("✅ Card de expediente encontrado e marcado com ID:", card);
             }
             cardsDiv.appendChild(card);
         });
