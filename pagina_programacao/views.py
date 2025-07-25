@@ -7,6 +7,7 @@ from calendar import monthrange
 from supabase import create_client
 from datetime import date, timedelta
 from collections import defaultdict
+from .models import Programacoes 
 
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"
@@ -518,3 +519,62 @@ def relatorio_mensal(request):
     # Sua lógica aqui
     return render(request, 'relatorio_mensal.html')
 
+
+
+@csrf_exempt
+@csrf_exempt
+def excluir_programacao(request):
+    if request.method == 'POST':
+        try:
+            print("🔍 Requisição recebida (POST):", request.body)
+
+            if not request.body:
+                print("⚠️ Body vazio")
+                return JsonResponse({'status': 'erro', 'msg': 'Body vazio'})
+
+            body = json.loads(request.body)
+            print("📦 JSON recebido:", body)
+
+            if body.get('_method') != 'DELETE':
+                print("⚠️ Método não é DELETE")
+                return JsonResponse({'status': 'erro', 'msg': 'Método inválido'})
+
+            data_str = body.get('data')
+            unidade_id = int(body.get('unidade_id'))
+            print("🗓️ Data:", data_str, "| 🏢 Unidade ID:", unidade_id)
+
+            if not data_str or not unidade_id:
+                print("⚠️ Parâmetros ausentes")
+                return JsonResponse({'status': 'erro', 'msg': 'Parâmetros ausentes'})
+
+            # Exclui alocações vinculadas à data + unidade
+            aloc_res = supabase.table("alocacoes")\
+                .delete()\
+                .eq("data", data_str)\
+                .eq("unidade_id", unidade_id)\
+                .execute()
+
+            # Exclui programações vinculadas à data + unidade
+            prog_res = supabase.table("programacoes")\
+                .delete()\
+                .eq("data", data_str)\
+                .eq("unidade_id", unidade_id)\
+                .execute()
+
+            total_excluidos = len((aloc_res.data or [])) + len((prog_res.data or []))
+            print(f"🧹 Registros removidos: {total_excluidos}")
+
+            if total_excluidos > 0:
+                return JsonResponse({'status': 'ok'})
+            else:
+                return JsonResponse({'status': 'erro', 'msg': 'Nada foi excluído'})
+
+        except json.JSONDecodeError:
+            print("❌ JSON malformado")
+            return JsonResponse({'status': 'erro', 'msg': 'JSON inválido'})
+        except Exception as e:
+            print("❌ Erro inesperado:", e)
+            return JsonResponse({'status': 'erro', 'msg': str(e)})
+
+    print("⚠️ Método não permitido")
+    return JsonResponse({'status': 'erro', 'msg': 'Método não permitido'})

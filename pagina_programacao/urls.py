@@ -14,5 +14,8 @@ urlpatterns = [
     path('api/programacao-mes/', views.api_programacao_mes, name='api_programacao_mes'),
     path('api/programacao-meses-disponiveis/', views.api_programacao_meses_disponiveis, name='programacao_meses_disponiveis'),
     path('api/relatorio-mensal/', views.api_relatorio_mensal, name='api_relatorio_mensal'),
+    path('excluir_programacao/', views.excluir_programacao, name='excluir_programacao'),
+
+
 ]
 

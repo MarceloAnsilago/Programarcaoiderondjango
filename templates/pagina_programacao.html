@@ -26,16 +26,44 @@
     <div id="calendar" class="mt-4"></div>
 
 </div>
+
+<!-- Modal de Confirmação de Exclusão -->
+<div class="modal fade" id="modalConfirmarExclusao" tabindex="-1" aria-labelledby="modalLabelExcluir" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalLabelExcluir">
+          <i class="bi bi-exclamation-circle-fill me-2"></i>Confirmação de Exclusão
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="mb-0">
+          Você deseja excluir todas as programações do dia
+          <strong id="modalConfirmarData" class="text-dark"></strong>?
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i>Cancelar
+        </button>
+        <button type="button" class="btn btn-outline-danger" id="btnConfirmarExclusao">
+          <i class="bi bi-trash-fill me-1"></i>Excluir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% include "relatorios.html" %}
 {% include "modal_programar_atividade.html" %}
 {% endblock %}
-
 {% block scripts %}
 <!-- ==== SCRIPTS EXTERNOS ==== -->
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
 <!-- ==== CSS CARDS/BADGE ==== -->
@@ -130,8 +158,7 @@ document.addEventListener("DOMContentLoaded", function() {
             });
     }
 
- 
-    carregarDatasProgramadas().then(function() {
+    carregarDatasProgramadas().then(function () {
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
@@ -141,51 +168,163 @@ document.addEventListener("DOMContentLoaded", function() {
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
             buttonText: { today: 'hoje', month: 'mês' },
             events: datasProgramadasEventos,
-          
-            dateClick: function(info) {
+
+            eventContent: function (arg) {
+                const container = document.createElement('div');
+
+                if (arg.event.classNames.includes('fc-badge-programado')) {
+                    container.style.display = 'flex';
+                    container.style.alignItems = 'center';
+                    container.style.justifyContent = 'center';
+                    container.style.gap = '6px';
+                    container.style.color = '#fff';
+
+                    const title = document.createElement('span');
+                    title.textContent = arg.event.title;
+
+                    const closeBtn = document.createElement('span');
+                    closeBtn.innerHTML = '&times;';
+                    closeBtn.title = 'Excluir programação';
+                    closeBtn.style.cursor = 'pointer';
+                    closeBtn.style.fontWeight = 'bold';
+                    closeBtn.style.fontSize = '1.2em';
+                    closeBtn.style.marginLeft = '6px';
+                    closeBtn.style.color = '#fff';
+
+                    closeBtn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        console.log("🔥 CLICOU NO BOTÃO X");
+
+                        const dataRef = arg.event.startStr;
+                        console.log("📆 Data para exclusão:", dataRef);
+
+                        const modalEl = document.getElementById('modalConfirmarExclusao');
+                        const modalData = document.getElementById('modalConfirmarData');
+                        const modalBtn = document.getElementById('btnConfirmarExclusao');
+
+                        console.log("🔎 modalEl:", modalEl);
+                        console.log("🔎 modalData:", modalData);
+                        console.log("🔎 modalBtn:", modalBtn);
+
+                        if (modalEl && modalData && modalBtn) {
+                            modalData.textContent = formatarData(dataRef);
+                            modalBtn.onclick = () => excluirProgramacaoDoDia(dataRef);
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                        } else {
+                            alert("⚠️ Modal ou botão não encontrado.");
+                        }
+                    });
+
+                    container.appendChild(title);
+                    container.appendChild(closeBtn);
+                } else {
+                    container.textContent = arg.event.title; // fallback
+                }
+
+                return { domNodes: [container] };
+            },
+
+            dateClick: function (info) {
                 const dataClicada = info.dateStr;
                 document.getElementById('dataSelecionada').value = dataClicada;
                 const [ano, mes, dia] = dataClicada.split('-');
                 document.getElementById('dataModalLabel').innerText = `${dia}/${mes}/${ano}`;
 
                 aguardarTodosChoicesProntos().then(() => {
-                    // 1. Busca dados de programação para a data
                     fetch(`/programacao/detalhe/?data=${dataClicada}&unidade_id=${unidadeId}`)
                         .then(r => r.json())
                         .then(json => {
                             prepararModalProgramarAtividade(json.alocacoes);
                             carregarResumosDeAlocacao(dataClicada, unidadeId);
 
-                            // 2. Busca servidores em descanso nessa data
                             fetch(`/descanso/api/descansos_na_data/?data=${dataClicada}&unidade_id=${unidadeId}`)
                                 .then(r => r.json())
                                 .then(descansos => {
-                                    // Popula a tabela de descanso no modal
                                     popularTabelaDescanso(descansos);
-                                    // Armazena os IDs dos servidores em descanso para usar depois
                                     window.idsServidoresEmDescanso = descansos.map(d => d.id);
-
-                                    // ATUALIZA O MULTI-SELECT FILTRANDO!
                                     atualizarChoicesServidoresComFiltroDescanso();
-
-                                    // Agora sim: montar os cards com o filtro certo!
                                     prepararModalProgramarAtividade(json.alocacoes);
 
-                                    // Abre o modal
-                                    var modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
+                                    const modal = new bootstrap.Modal(document.getElementById('modalProgramarAtividade'));
                                     modal.show();
                                 });
                         });
                 });
             },
-            datesSet: function(info) {
+
+            datesSet: function (info) {
                 const ano = info.view.currentStart.getFullYear();
                 const mes = info.view.currentStart.getMonth() + 1;
                 window.popularSelectSemana(ano, mes);
             }
         });
+
         calendar.render();
     });
+
+    // Função de exclusão
+    function excluirProgramacaoDoDia(data) {
+        console.log("🧨 Função excluirProgramacaoDoDia foi chamada com data:", data);
+
+        fetch('/programacao/excluir_programacao/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                _method: 'DELETE',
+                data: data,
+                unidade_id: unidadeId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("📥 Resposta do backend:", data);
+            if (data.status === 'ok') {
+                alert('Programação excluída com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro: ' + data.msg);
+            }
+        })
+        .catch(error => console.error('💥 Erro ao excluir programação:', error));
+    }
+
+    // Função auxiliar para formatar a data (yyyy-mm-dd para dd/mm/yyyy)
+    function formatarData(dataStr) {
+        const [ano, mes, dia] = dataStr.split('-');
+        return `${dia}/${mes}/${ano}`;
+    }
+
+  
+    function excluirProgramacaoDoDia(data) {
+        console.log("🧨 Função excluirProgramacaoDoDia foi chamada com data:", data); // 👈 ADICIONA ISSO AQUI
+
+        fetch('/programacao/excluir_programacao/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                _method: 'DELETE',
+                data: data,
+                unidade_id: unidadeId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("📥 Resposta do backend:", data); // 👈 E ESSE TAMBÉM!
+            if (data.status === 'ok') {
+                alert('Programação excluída com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro: ' + data.msg);
+            }
+        })
+        .catch(error => console.error('💥 Erro ao excluir programação:', error));
+    }
+
+
 
     function carregarResumosDeAlocacao(data, unidadeId) {
         fetch(`/programacao/resumo_alocacoes/?data=${data}&unidade_id=${unidadeId}`)
