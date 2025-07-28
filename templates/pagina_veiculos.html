@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h2 class="text-center my-4">Cadastro de Veículos</h2>
+
 {% if mensagem %}
   <div class="alert alert-success">{{ mensagem }}</div>
 {% endif %}
+
+<!-- 📝 Formulário -->
 <form method="POST" class="row g-3 mt-4" autocomplete="off">
     {% csrf_token %}
     <div class="col-md-4">
@@ -20,15 +23,31 @@
     </div>
     <div class="col-12">
         <button type="submit" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Cadastrar
+            <i class="bi bi-truck"></i> Cadastrar
+        </button>
+    </div>
+</form>
+
+<!-- 🔍 Filtros -->
+<form method="GET" class="row mt-4 mb-2">
+    <div class="col-md-4">
+        <input type="text" name="busca" value="{{ termo_busca }}" placeholder="Buscar por modelo ou placa" class="form-control">
+    </div>
+    <div class="col-md-2 form-check my-auto">
+        <input type="checkbox" name="inativos" id="inativos" class="form-check-input" {% if exibir_inativos %}checked{% endif %}>
+        <label for="inativos" class="form-check-label">Exibir Inativos</label>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-filter-circle"></i> Filtrar
         </button>
     </div>
 </form>
 
 <hr>
 <h4>Veículos cadastrados:</h4>
-<table class="table">
-    <thead>
+<table class="table table-hover align-middle">
+    <thead class="table-light">
         <tr>
             <th>Modelo</th>
             <th>Placa</th>
@@ -41,14 +60,37 @@
         <tr>
             <td>{{ v.modelo }}</td>
             <td>{{ v.placa }}</td>
-            <td>{{ v.status }}</td>
             <td>
-                <form method="post" action="{% url 'excluir_veiculos' v.id %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
-                </form>
-                <a href="{% url 'editar_veiculos' v.id %}" class="btn btn-warning btn-sm">Editar</a>
+                {% if v.status == "Ativo" %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Ativo</span>
+                {% else %}
+                    <span class="badge bg-secondary"><i class="bi bi-slash-circle"></i> Inativo</span>
+                {% endif %}
             </td>
+            <td>
+                <a href="{% url 'editar_veiculos' v.id %}" class="btn btn-warning btn-sm me-1">
+                    <i class="bi bi-pencil-square"></i> Editar
+                </a>
+                {% if v.status == "Ativo" %}
+                    <form method="post" action="{% url 'inativar_veiculo' v.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="bi bi-x-circle"></i> Inativar
+                        </button>
+                    </form>
+                {% else %}
+                    <form method="post" action="{% url 'reativar_veiculo' v.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="bi bi-arrow-clockwise"></i> Ativar
+                        </button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" class="text-center text-muted">Nenhum veículo encontrado.</td>
         </tr>
         {% endfor %}
     </tbody>
