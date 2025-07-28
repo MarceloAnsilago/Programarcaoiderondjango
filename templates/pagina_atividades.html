@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h2 class="text-center my-4">Cadastro de Atividades</h2>
+
 {% if mensagem %}
   <div class="alert alert-success">{{ mensagem }}</div>
 {% endif %}
+
+<!-- 📋 Formulário de Cadastro -->
 <form method="POST" class="row g-3 mt-4" autocomplete="off">
     {% csrf_token %}
     <div class="col-md-6">
@@ -25,15 +28,32 @@
     </div>
     <div class="col-12">
         <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check2-circle"></i> Cadastrar
+            <i class="bi bi-plus-circle"></i> Cadastrar
         </button>
     </div>
 </form>
 
+<!-- 🔍 FILTROS -->
+<form method="GET" class="row mt-4 mb-2">
+    <div class="col-md-4">
+        <input type="text" name="busca" value="{{ termo_busca }}" placeholder="Buscar por nome" class="form-control">
+    </div>
+    <div class="col-md-2 form-check my-auto">
+        <input type="checkbox" name="inativos" id="inativos" class="form-check-input" {% if exibir_inativos %}checked{% endif %}>
+        <label for="inativos" class="form-check-label">Exibir Inativos</label>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-info text-white">
+            <i class="bi bi-filter-circle"></i> Filtrar
+        </button>
+    </div>
+</form>
 <hr>
 <h4>Atividades cadastradas:</h4>
-<table class="table">
-    <thead>
+
+<!-- 🧾 Tabela de atividades -->
+<table class="table table-hover align-middle">
+    <thead class="table-light">
         <tr>
             <th>Nome</th>
             <th>Classificação</th>
@@ -46,16 +66,41 @@
         <tr>
             <td>{{ a.nome }}</td>
             <td>{{ a.classificacao }}</td>
-            <td>{{ a.status }}</td>
             <td>
-                <!-- Excluir -->
-                <form method="post" action="{% url 'excluir_atividade' a.id %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
-                </form>
-                <!-- Editar -->
-                <a href="{% url 'editar_atividade' a.id %}" class="btn btn-warning btn-sm">Editar</a>
+                {% if a.status == "Ativo" %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Ativo</span>
+                {% else %}
+                    <span class="badge bg-secondary"><i class="bi bi-slash-circle"></i> Inativo</span>
+                {% endif %}
             </td>
+          
+            <td>
+                <!-- Editar -->
+                <a href="{% url 'editar_atividade' a.id %}" class="btn btn-warning btn-sm me-1">
+                    <i class="bi bi-pencil-square"></i> Editar
+                </a>
+
+                <!-- Inativar / Reativar -->
+                {% if a.status == "Ativo" %}
+                    <form method="post" action="{% url 'inativar_atividade' a.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="bi bi-x-circle"></i> Inativar
+                        </button>
+                    </form>
+                {% else %}
+                    <form method="post" action="{% url 'reativar_atividade' a.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="bi bi-arrow-clockwise"></i> Ativar
+                        </button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" class="text-center text-muted">Nenhuma atividade encontrada.</td>
         </tr>
         {% endfor %}
     </tbody>

@@ -5,24 +5,27 @@ from django.shortcuts import render
 from supabase import create_client, Client
 from django.shortcuts import redirect
 from django.http import JsonResponse
+from urllib.parse import quote_plus 
 # Create your views here.
 
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"  # Pegue em Settings > API > anon/public
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-
 def pagina_servidores(request):
     mensagem = ""
+    exibir_inativos = request.GET.get("inativos") == "on"
+    termo_busca = request.GET.get("busca", "").strip()
+
     if request.method == "POST":
+        # Formulário de cadastro
         nome = request.POST.get("nome")
         telefone = request.POST.get("telefone")
         matricula = request.POST.get("matricula")
         cargo = request.POST.get("cargo")
         status = "Ativo"
-        unidade_id = 1  # Você pode trocar depois para o da unidade logada
+        unidade_id = 1
 
-        # Envia para o Supabase
         data = {
             "nome": nome,
             "telefone": telefone,
@@ -31,26 +34,39 @@ def pagina_servidores(request):
             "status": status,
             "unidade_id": unidade_id
         }
+
         try:
-            response = supabase.table("servidores").insert(data).execute()
+            supabase.table("servidores").insert(data).execute()
             mensagem = "Servidor cadastrado com sucesso!"
         except Exception as e:
             mensagem = f"Erro ao cadastrar: {e}"
 
-    # Busca todos os servidores para listar (opcional, se quiser mostrar abaixo do form)
-    servidores = supabase.table("servidores").select("*").execute().data
+    # 🔥 Sempre executa esta parte, tanto para GET como após POST
+    try:
+        query = supabase.table("servidores").select("*")
 
+        status_filtro = "Inativo" if exibir_inativos else "Ativo"
+
+        if termo_busca and len(termo_busca) >= 2:
+            query = query.eq("status", status_filtro).or_(
+                f"nome.ilike.*{termo_busca}*,matricula.ilike.*{termo_busca}*"
+            )
+        else:
+            query = query.eq("status", status_filtro)
+   
+
+        servidores = query.order("id", desc=True).execute().data
+
+    except Exception as e:
+        return HttpResponse(f"<h3>❌ ERRO ao buscar servidores:</h3><pre>{e}</pre>", status=500)
+
+    # ✅ Garante retorno da página
     return render(request, "pagina_servidores.html", {
         "mensagem": mensagem,
-        "servidores": servidores
+        "servidores": servidores,
+        "termo_busca": termo_busca,
+        "exibir_inativos": exibir_inativos,
     })
-
-
-
-def excluir_servidor(request, servidor_id):
-    if request.method == "POST":
-        supabase.table("servidores").delete().eq("id", servidor_id).execute()
-    return redirect("pagina_servidores")
 
 def editar_servidor(request, servidor_id):
     # Busca o servidor atual pelo ID
@@ -79,6 +95,16 @@ def editar_servidor(request, servidor_id):
             return render(request, "editar_servidor.html", {"servidor": servidor, "erro": f"Erro ao atualizar: {e}"})
 
     return render(request, "editar_servidor.html", {"servidor": servidor})
+def inativar_servidor(request, servidor_id):
+    if request.method == "POST":
+        try:
+            supabase.table("servidores").update({
+                "status": "Inativo"
+            }).eq("id", servidor_id).execute()
+        except Exception as e:
+            return HttpResponse(f"Erro ao inativar: {e}", status=500)
+    return redirect("pagina_servidores")
+
 
 def servidores_ativos(request):
     unidade_id = request.GET.get("unidade_id")  # ou defina fixo, ex: 1
@@ -92,3 +118,13 @@ def servidores_ativos(request):
         .data
     )
     return JsonResponse(servidores, safe=False)
+
+def reativar_servidor(request, servidor_id):
+    if request.method == "POST":
+        try:
+            supabase.table("servidores").update({
+                "status": "Ativo"
+            }).eq("id", servidor_id).execute()
+        except Exception as e:
+            return HttpResponse(f"Erro ao reativar: {e}", status=500)
+    return redirect("pagina_servidores")

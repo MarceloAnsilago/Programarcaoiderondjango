@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h2 class="text-center my-4">Cadastro de Servidores</h2>
+
 {% if mensagem %}
   <div class="alert alert-success">{{ mensagem }}</div>
 {% endif %}
+
+<!-- 📋 Formulário de Cadastro -->
 <form method="POST" class="row g-3 mt-4" autocomplete="off">
     {% csrf_token %}
     <div class="col-md-3">
@@ -25,15 +28,33 @@
     </div>
 </form>
 
+<!-- 🔍 Filtro e busca -->
+<form method="GET" class="my-4 row">
+    <div class="col-md-4">
+        <input type="text" name="busca" value="{{ termo_busca }}" placeholder="Buscar por nome ou matrícula" class="form-control">
+    </div>
+    <div class="col-md-2 form-check my-auto">
+        <input type="checkbox" name="inativos" id="inativos" class="form-check-input" {% if exibir_inativos %}checked{% endif %}>
+        <label for="inativos" class="form-check-label">Exibir Inativos</label>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-info text-white">
+            <i class="bi bi-filter-circle"></i> Filtrar
+        </button>
+    </div>
+</form>
+
 <hr>
 <h4>Servidores cadastrados:</h4>
-<table class="table">
-    <thead>
+
+<table class="table table-hover align-middle">
+    <thead class="table-light">
         <tr>
             <th>Nome</th>
             <th>Telefone</th>
             <th>Cargo</th>
             <th>Matrícula</th>
+            <th>Status</th>
             <th>Ações</th>
         </tr>
     </thead>
@@ -45,17 +66,45 @@
             <td>{{ s.cargo }}</td>
             <td>{{ s.matricula }}</td>
             <td>
-                <!-- Excluir -->
-                <form method="post" action="{% url 'excluir_servidor' s.id %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
-                </form>
-                <!-- Editar -->
-                <a href="{% url 'editar_servidor' s.id %}" class="btn btn-warning btn-sm">Editar</a>
+                {% if s.status == "Ativo" %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle"></i> Ativo
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary">
+                        <i class="bi bi-slash-circle"></i> Inativo
+                    </span>
+                {% endif %}
             </td>
+            <td>
+                <!-- Editar -->
+                <a href="{% url 'editar_servidor' s.id %}" class="btn btn-warning btn-sm me-1">
+                    <i class="bi bi-pencil-square"></i> Editar
+                </a>
+
+                <!-- Inativar / Ativar -->
+                {% if s.status == "Ativo" %}
+                    <form method="post" action="{% url 'inativar_servidor' s.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="bi bi-x-circle"></i> Inativar
+                        </button>
+                    </form>
+                {% else %}
+                    <form method="post" action="{% url 'reativar_servidor' s.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success btn-sm">
+                            <i class="bi bi-arrow-clockwise"></i> Ativar
+                        </button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-center text-muted">Nenhum servidor encontrado.</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% endblock %}
-
