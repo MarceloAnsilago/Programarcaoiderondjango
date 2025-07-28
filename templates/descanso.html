@@ -7,6 +7,34 @@
         <i class="bi bi-moon" style="color: #073074;"></i>
         Descanso dos Servidores
     </h2>
+
+    <!-- 🔍 FILTRO POR CRIADO_EM -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label for="filtro-criado-em" class="form-label"><strong>Filtrar por data de criação:</strong></label>
+            <select id="filtro-criado-em" class="form-select">
+                <option value="">-- Todos os Anos --</option>
+                {% for ano in datas_unicas %}
+                    <option value="{{ ano }}">{{ ano }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <script>
+        // Remove opções duplicadas do select
+        window.addEventListener("DOMContentLoaded", function () {
+            const select = document.getElementById("filtro-criado-em");
+            const seen = {};
+            Array.from(select.options).forEach((opt, index) => {
+                if (opt.value && seen[opt.value]) {
+                    select.removeChild(opt);
+                } else {
+                    seen[opt.value] = true;
+                }
+            });
+        });
+    </script>
+    <!-- TABELA DE SERVIDORES -->
     <table class="table table-bordered align-middle">
         <thead>
             <tr>
@@ -52,7 +80,7 @@
                         </thead>
                         <tbody>
                             {% for d in s.descansos %}
-                            <tr>
+                            <tr data-criado-em="{{ d.criado_em|date:'Y-m-d' }}">
                                 <td>{{ d.tipo }}</td>
                                 <td>{{ d.data_inicio }}</td>
                                 <td>{{ d.data_fim }}</td>
@@ -72,9 +100,7 @@
                                 </td>
                             </tr>
                             {% empty %}
-                            <tr>
-                                <td colspan="4">Nenhum período cadastrado.</td>
-                            </tr>
+                            <tr><td colspan="4">Nenhum período cadastrado.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -85,7 +111,7 @@
     </table>
 </div>
 
-<!-- TÍTULO E BOTÃO ABAIXO -->
+<!-- TÍTULO E BOTÃO DE IMPRESSÃO -->
 <div class="container no-print" style="margin-top:2.5rem; margin-bottom:0.7rem;">
     <h3 style="font-weight:bold;">
         <i class="bi bi-geo-alt" style="color:#073074;"></i>
@@ -96,7 +122,7 @@
     </button>
 </div>
 
-<!-- MAPA ESCONDIDO, SÓ APARECE NA IMPRESSÃO -->
+<!-- MAPA ESCONDIDO PARA IMPRESSÃO -->
 <div class="container mt-4 only-print" id="mapa-escala-imprimir" style="display:none;">
     <h3 style="margin: 0 0 10px 0; font-weight: bold;">
         <i class="bi bi-geo-alt" style="color:#073074;"></i>
@@ -131,57 +157,74 @@
         Dias em preto indicam o período de férias do servidor.
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Troca seta do botão ao abrir/fechar
-    document.querySelectorAll('.toggle-descansos').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const icon = this.querySelector('i');
-            const targetId = this.getAttribute('data-bs-target');
-            const row = document.querySelector(targetId);
-            setTimeout(function() {
-                if (row.classList.contains('show')) {
-                    icon.classList.remove('bi-caret-down-fill');
-                    icon.classList.add('bi-caret-right-fill');
-                } else {
-                    icon.classList.remove('bi-caret-right-fill');
-                    icon.classList.add('bi-caret-down-fill');
-                }
-            }, 200);
+    // Filtro por ANO de criado_em
+    document.getElementById("filtro-criado-em").addEventListener("change", function () {
+        const filtro = this.value;
+
+        // Filtra cada linha de descanso por ano
+        document.querySelectorAll("tr[data-criado-em]").forEach(row => {
+            const criado_em = row.getAttribute("data-criado-em");
+            const ano = criado_em ? new Date(criado_em).getFullYear().toString() : "";
+
+            const show = !filtro || ano === filtro;
+            row.style.display = show ? "" : "none";
+        });
+
+        // Mostra/oculta a linha colapsável do servidor com base nos descansos visíveis
+        document.querySelectorAll("tr[id^='descansos-']").forEach(wrapper => {
+            const visiveis = wrapper.querySelectorAll("tbody tr[data-criado-em]:not([style*='display: none'])").length;
+            wrapper.style.display = visiveis ? "" : "none";
         });
     });
 
-    // Função para imprimir só o mapa de férias (paisagem e visual limpo)
+    // Toggle seta de colapso
+document.getElementById("filtro-criado-em").addEventListener("change", function () {
+    const filtro = this.value;
+
+    // Para cada linha colapsável (descansos do servidor)
+    document.querySelectorAll("tr[id^='descansos-']").forEach(wrapper => {
+        const rows = wrapper.querySelectorAll("tr[data-criado-em]");
+        let algumVisivel = false;
+
+        rows.forEach(row => {
+            const criado_em = row.getAttribute("data-criado-em");
+            const ano = criado_em ? new Date(criado_em).getFullYear().toString() : "";
+
+            const visivel = !filtro || ano === filtro;
+            row.style.display = visivel ? "" : "none";
+
+            if (visivel) {
+                algumVisivel = true;
+            }
+        });
+
+        // Mostra ou esconde o bloco do servidor
+        wrapper.style.display = algumVisivel ? "" : "none";
+    });
+});
+
+    // Impressão do mapa
     function printDivConteudo(divId) {
         var div = document.getElementById(divId);
-        if (!div) {
-            alert('Bloco não encontrado: ' + divId);
-            return;
-        }
+        if (!div) return alert('Bloco não encontrado: ' + divId);
         var conteudo = div.innerHTML;
         var style = `
             <style>
                 @page { size: landscape; }
-                body { margin: 2em; background: #fff; color: #000; font-family: Arial, sans-serif; }
-                h3 { margin-top: 0; }
-                .border { border: 1px solid #bbb !important; }
-                .mb-3 { margin-bottom: 1.5rem !important; }
-                .p-2 { padding: 0.5rem !important; }
-                .text-center { text-align: center !important; }
-                .mt-4 { margin-top: 1.5rem !important; }
+                body { margin: 2em; font-family: Arial, sans-serif; }
                 .dia-ferias, .dia-normal {
-                    display: inline-flex !important;
-                    align-items: center;
-                    justify-content: center;
-                    vertical-align: middle;
+                    display: inline-flex;
                     width: 22px;
                     height: 22px;
-                    margin: 1px;
+                    justify-content: center;
+                    align-items: center;
                     font-size: 13px;
                     border: 1px solid #555;
-                    box-sizing: border-box;
                 }
                 .dia-ferias { background: #111; color: #fff; }
                 .dia-normal { background: #fff; color: #111; }
@@ -189,22 +232,10 @@
             </style>
         `;
         var win = window.open('', '', 'width=1100,height=800');
-        win.document.write(`
-            <html>
-                <head>
-                    <title>Impressão Mapa de Férias</title>
-                    ${style}
-                </head>
-                <body>
-                    ${conteudo}
-                </body>
-            </html>
-        `);
+        win.document.write(`<html><head><title>Impressão</title>${style}</head><body>${conteudo}</body></html>`);
         win.document.close();
-        win.onload = function() {
-            win.focus();
-            win.print();
-            setTimeout(function() { win.close(); }, 200);
+        win.onload = function () {
+            win.focus(); win.print(); setTimeout(() => win.close(), 200);
         };
     }
 </script>
@@ -213,93 +244,44 @@
 {% block extra_css %}
 <style>
 .dia-ferias, .dia-normal {
-    display: inline-flex !important;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    vertical-align: middle;
     width: 22px;
     height: 22px;
     margin: 1px;
     font-size: 13px;
-    border: 1px solid #007bff !important;
-    box-sizing: border-box;
     border-radius: 4px;
-    font-weight: 500;
-    transition: background 0.3s;
 }
 .dia-ferias {
-    background: #007bff !important;
-    color: #fff !important;
-    border: 1.5px solid #0056b3 !important;
+    background: #007bff;
+    color: #fff;
+    border: 1.5px solid #0056b3;
 }
 .dia-normal {
-    background: #f0f0f0 !important;
-    color: #111 !important;
-    border: 1px solid #ccc !important;
+    background: #f0f0f0;
+    color: #111;
+    border: 1px solid #ccc;
 }
-
-/* Estilo moderno para o botão do mapa */
 .btn-map-print {
     background: linear-gradient(90deg, #1363c6 0%, #0d396a 100%);
-    color: #fff !important;
+    color: #fff;
     font-weight: 600;
     border: none;
     border-radius: 6px;
     padding: 0.65em 1.4em;
     font-size: 1.07em;
     box-shadow: 0 2px 10px rgba(19, 99, 198, 0.10);
-    transition: background 0.2s, box-shadow 0.2s, color 0.2s;
-    letter-spacing: 0.02em;
-    outline: none;
 }
-.btn-map-print:hover, .btn-map-print:focus {
+.btn-map-print:hover {
     background: linear-gradient(90deg, #1d82e9 0%, #073074 100%);
     color: #fff;
-    box-shadow: 0 4px 16px rgba(19, 99, 198, 0.17);
-    text-decoration: none;
 }
-.btn-map-print i {
-    margin-right: 5px;
-    font-size: 1.08em;
-    vertical-align: -1px;
-}
-@media (max-width: 700px) {
-    .btn-map-print {
-        width: 100%;
-        margin-top: 1rem;
-    }
-}
-
 .only-print { display: none !important; }
 @media print {
-  .only-print { display: block !important; }
-  .sidebar, .sidebar-menu, .menu-lateral, .offcanvas, .no-print, nav, header {
-    display: none !important;
-    visibility: hidden !important;
-  }
-  .container, .container-fluid {
-    margin: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-  }
-  body {
-    background: #fff !important;
-    color: #111 !important;
-  }
-  #mapa-escala-imprimir .no-print, #mapa-escala-imprimir button {
-    display: none !important;
-  }
-  .dia-ferias {
-    background: #111 !important;
-    color: #fff !important;
-    border: 1px solid #555 !important;
-  }
-  .dia-normal {
-    background: #fff !important;
-    color: #111 !important;
-    border: 1px solid #555 !important;
-  }
-  .only-print { display: block !important; }
+    .only-print { display: block !important; }
+    .no-print, .sidebar, nav, header, button { display: none !important; }
+    .container { width: 100%; max-width: 100%; }
 }
 </style>
 {% endblock %}

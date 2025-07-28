@@ -20,6 +20,9 @@ def lista_servidores_ativos(request):
         .execute()
         .data
     )
+
+    datas_unicas = set()  # ← para o filtro
+
     # Para cada servidor, puxa os descansos
     for s in servidores:
         descansos = (
@@ -29,6 +32,16 @@ def lista_servidores_ativos(request):
             .execute()
             .data
         )
+
+        # Extrair datas únicas de criado_em
+        for d in descansos:
+            if d.get("criado_em"):
+                try:
+                    dt = datetime.fromisoformat(d["criado_em"])
+                    datas_unicas.add(dt.year)
+                except Exception:
+                    pass
+
         s["descansos"] = descansos
 
     # --------- MAPA ESCALA ----------
@@ -65,7 +78,9 @@ def lista_servidores_ativos(request):
         "servidores": servidores,
         "ano": ano,
         "meses": meses,
+        "datas_unicas": sorted(datas_unicas),  # 💡 aqui
     })
+
 
 def lista_descansos_servidor(request, servidor_id):
     descansos = (
@@ -335,3 +350,5 @@ def descansos_intervalo(request):
                 })
 
     return JsonResponse(resultado, safe=False)
+
+
