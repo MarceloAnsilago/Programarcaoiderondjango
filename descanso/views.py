@@ -3,7 +3,6 @@ from supabase import create_client
 from datetime import datetime, timedelta  
 from django.http import JsonResponse
 import calendar
-from .models import Descanso
 
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"
@@ -11,76 +10,95 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def lista_servidores_ativos(request):
-    unidade_id = 1  # depois troque para o usuário logado
-    servidores = (
-        supabase.table("servidores")
-        .select("*")
-        .eq("status", "Ativo")
-        .eq("unidade_id", unidade_id)
-        .execute()
-        .data
-    )
+    try:
+        unidade_id = 1  # depois altere para o usuário logado
+        ano_selecionado = request.GET.get('ano')
 
-    datas_unicas = set()  # ← para o filtro
+        # Buscar datas de criação dos descansos
+        resp = supabase.table("descansos").select("criado_em").execute()
+        datas_criacao = resp.data or []
 
-    # Para cada servidor, puxa os descansos
-    for s in servidores:
-        descansos = (
-            supabase.table("descansos")
-            .select("*")
-            .eq("servidor_id", s["id"])
-            .execute()
-            .data
-        )
-
-        # Extrair datas únicas de criado_em
-        for d in descansos:
-            if d.get("criado_em"):
-                try:
-                    dt = datetime.fromisoformat(d["criado_em"])
-                    datas_unicas.add(dt.year)
-                except Exception:
-                    pass
-
-        s["descansos"] = descansos
-
-    # --------- MAPA ESCALA ----------
-    ano = 2025  # ou outro ano dinâmico
-    descansos_todos = supabase.table("descansos").select("*").execute().data
-    servidores_mapa = supabase.table("servidores").select("id, nome").execute().data
-
-    meses = []
-    for mes in range(1, 13):
-        dias_do_mes = list(range(1, calendar.monthrange(ano, mes)[1] + 1))
-        linhas_servidor = []
-        for s in servidores_mapa:
-            periodos = []
-            for d in descansos_todos:
-                if d["servidor_id"] == s["id"]:
-                    data_ini = datetime.strptime(d["data_inicio"], "%Y-%m-%d").date()
-                    data_fim = datetime.strptime(d["data_fim"], "%Y-%m-%d").date()
-                    for dt in (data_ini + timedelta(days=n) for n in range((data_fim - data_ini).days + 1)):
-                        if dt.year == ano and dt.month == mes:
-                            periodos.append(dt.day)
-            if periodos:
-                linhas_servidor.append({
-                    "nome": s["nome"],
-                    "periodos_dias": sorted(list(set(periodos))),
-                })
-        meses.append({
-            "numero": mes,
-            "nome": calendar.month_name[mes].capitalize(),
-            "dias": dias_do_mes,
-            "linhas_servidor": linhas_servidor
+        # Ignora nulos e converte para ano
+        anos_unicos = sorted({
+            datetime.fromisoformat(d["criado_em"]).year
+            for d in datas_criacao
+            if d.get("criado_em")
         })
 
-    return render(request, "descanso.html", {
-        "servidores": servidores,
-        "ano": ano,
-        "meses": meses,
-        "datas_unicas": sorted(datas_unicas),  # 💡 aqui
-    })
+        # Buscar servidores ativos da unidade
+        servidores = supabase.table("servidores") \
+            .select("*") \
+            .eq("status", "Ativo") \
+            .eq("unidade_id", unidade_id) \
+            .execute().data or []
 
+        servidores_filtrados = []
+        descansos_todos = []
+
+        for s in servidores:
+            query = supabase.table("descansos").select("*").eq("servidor_id", s["id"])
+            if ano_selecionado:
+                data_ini = f"{ano_selecionado}-01-01T00:00:00"
+                data_fim = f"{ano_selecionado}-12-31T23:59:59"
+                query = query.gte("criado_em", data_ini).lte("criado_em", data_fim)
+
+            descansos_filtrados = query.execute().data or []
+
+            if descansos_filtrados:
+                s["descansos"] = descansos_filtrados
+                servidores_filtrados.append(s)
+                descansos_todos.extend(descansos_filtrados)
+
+        ano_mapa = int(ano_selecionado) if ano_selecionado else datetime.now().year
+
+        servidores_mapa = supabase.table("servidores").select("id, nome").execute().data or []
+        meses = []
+
+        for mes in range(1, 13):
+            dias_do_mes = list(range(1, calendar.monthrange(ano_mapa, mes)[1] + 1))
+            linhas_servidor = []
+            for s in servidores_mapa:
+                periodos = []
+                for d in descansos_todos:
+                    if d["servidor_id"] == s["id"]:
+                        try:
+                            data_ini = datetime.strptime(d["data_inicio"], "%Y-%m-%d").date()
+                            data_fim = datetime.strptime(d["data_fim"], "%Y-%m-%d").date()
+                            dias = [
+                                dt.day for dt in (
+                                    data_ini + timedelta(days=n)
+                                    for n in range((data_fim - data_ini).days + 1)
+                                ) if dt.year == ano_mapa and dt.month == mes
+                            ]
+                            periodos += dias
+                        except Exception:
+                            continue  # ignora erro de data malformada
+                if periodos:
+                    linhas_servidor.append({
+                        "nome": s["nome"],
+                        "periodos_dias": sorted(set(periodos))
+                    })
+            meses.append({
+                "numero": mes,
+                "nome": calendar.month_name[mes].capitalize(),
+                "dias": dias_do_mes,
+                "linhas_servidor": linhas_servidor
+            })
+
+        context = {
+            "servidores": servidores_filtrados if ano_selecionado else servidores,
+            "anos_unicos": anos_unicos,
+            "ano_selecionado": ano_selecionado,
+            "meses": meses,
+            "ano": ano_mapa
+        }
+        return render(request, "descanso.html", context)
+
+    except Exception as e:
+        # Renderiza erro amigável na página
+        return render(request, "erro_supabase.html", {
+            "mensagem": f"Ocorreu um erro ao acessar os dados da Supabase: {e}"
+        })
 
 def lista_descansos_servidor(request, servidor_id):
     descansos = (
@@ -227,6 +245,7 @@ def descansos_na_semana(request):
     ano = int(request.GET.get("ano"))
     mes = int(request.GET.get("mes"))
 
+    # calcula as datas da semana com base no mês e índice
     from calendar import monthrange
     from datetime import date
 
@@ -270,18 +289,16 @@ def descansos_na_semana(request):
         if servidor:
             resultado.append({
                 "nome": servidor["nome"],
-                "tipo_descanso": d["tipo"],
-                "data_inicio": d["data_inicio"],
-                "data_fim": d["data_fim"]
+                "tipo_descanso": d["tipo"]
             })
 
     return JsonResponse(resultado, safe=False)
-
 def descansos_do_mes(request):
     unidade_id = int(request.GET.get("unidade_id", 1))
     ano = int(request.GET.get("ano"))
     mes = int(request.GET.get("mes"))
 
+    # busca servidores ativos
     servidores = supabase.table("servidores") \
         .select("id, nome") \
         .eq("status", "Ativo") \
@@ -304,51 +321,7 @@ def descansos_do_mes(request):
             if servidor:
                 resultado.append({
                     "nome": servidor["nome"],
-                    "tipo_descanso": d["tipo"],
-                    "data_inicio": ini.isoformat(),  
-                    "data_fim": fim.isoformat()       
+                    "tipo_descanso": d["tipo"]
                 })
 
     return JsonResponse(resultado, safe=False)
-
-def descansos_intervalo(request):
-    data_inicial = request.GET.get('data_inicial')
-    data_final = request.GET.get('data_final')
-    unidade_id = int(request.GET.get("unidade_id", 1))
-    if not data_inicial or not data_final:
-        return JsonResponse([], safe=False)
-
-    from datetime import datetime
-
-    dt_ini = datetime.strptime(data_inicial, "%d/%m/%Y").date()
-    dt_fim = datetime.strptime(data_final, "%d/%m/%Y").date()
-
-    servidores = supabase.table("servidores") \
-        .select("id, nome") \
-        .eq("status", "Ativo") \
-        .eq("unidade_id", unidade_id) \
-        .execute().data
-    servidor_ids = [s["id"] for s in servidores]
-
-    descansos = supabase.table("descansos") \
-        .select("*") \
-        .in_("servidor_id", servidor_ids) \
-        .execute().data
-
-    resultado = []
-    for d in descansos:
-        ini = datetime.strptime(d["data_inicio"], "%Y-%m-%d").date()
-        fim = datetime.strptime(d["data_fim"], "%Y-%m-%d").date()
-        if ini <= dt_fim and fim >= dt_ini:
-            servidor = next((s for s in servidores if s["id"] == d["servidor_id"]), None)
-            if servidor:
-                resultado.append({
-                    "nome": servidor["nome"],
-                    "tipo_descanso": d["tipo"],
-                    "data_inicio": ini.isoformat(),
-                    "data_fim": fim.isoformat()
-                })
-
-    return JsonResponse(resultado, safe=False)
-
-
