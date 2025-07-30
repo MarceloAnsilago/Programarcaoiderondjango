@@ -70,7 +70,10 @@
 
     <!-- Separador visual -->
     <hr class="my-5">
-
+    <div class="mb-3">
+        <label for="filtroAno" class="form-label"><i class="bi bi-calendar"></i> Filtrar por Ano</label>
+        <select id="filtroAno" class="form-select" style="max-width: 200px;"></select>
+    </div>
     <!-- Lista de Plantões Salvos -->
     <div class="mt-4">
         <h5>
@@ -343,9 +346,13 @@ document.getElementById('formPlantao').onsubmit = function(e) {
     document.getElementById('boxMultiSelectServidores').style.display = "none";
     const descansoContainer = document.getElementById('blocoDescansoPlantao');
     descansoContainer.innerHTML = `<div class="text-center my-2"><span class="spinner-border spinner-border-sm"></span> Carregando...</div>`;
-
+    
+    function parseDateToISO(strBR) {
+        const [dia, mes, ano] = strBR.split('/');
+        return `${ano}-${mes}-${dia}`;
+    }
     Promise.all([
-        carregarBlocoDescansoPorIntervalo(dataIni, dataFim),
+        carregarBlocoDescansoPorIntervalo(parseDateToISO(dataIni), parseDateToISO(dataFim)),
         fetch(`/servidores/ativos/?unidade_id=${unidade_id}`).then(r => r.json())
     ]).then(([descansos, servidores]) => {
         // Tabela de descansos
@@ -429,13 +436,25 @@ document.getElementById('formPlantao').onsubmit = function(e) {
 let modalSalvar = new bootstrap.Modal(document.getElementById('modalSalvarPlantao'));
 
 document.getElementById('btnSalvarPlantao').onclick = () => {
-    if (!semanasGeradas.length || !escalaServidoresSelecionados.length) {
-        alert("⚠️ Nenhuma escala gerada para salvar.");
+    if (!semanasGeradas.length) {
+        alert("⚠️ Gere a escala antes de salvar.");
         return;
     }
+
+    const dtIni = semanasGeradas[0][0];
+    const dtFim = semanasGeradas[semanasGeradas.length - 1][1];
+
+    for (let p of plantoesExistentes) {
+        const pIni = new Date(p.data_inicio);
+        const pFim = new Date(p.data_fim);
+
+        if (!(dtFim < pIni || dtIni > pFim)) {
+            return alert(`⚠️ Sobreposição de plantão com "${p.nome}" (${pIni.toLocaleDateString()} – ${pFim.toLocaleDateString()}).`);
+        }
+    }
+
     modalSalvar.show();
 };
-
 document.getElementById('confirmarSalvarPlantao').onclick = () => {
     const nome = document.getElementById('nomePlantao').value.trim();
     if (!nome) {
@@ -465,6 +484,7 @@ document.getElementById('confirmarSalvarPlantao').onclick = () => {
     .then(resp => resp.json())
     .then(data => {
         if (data.success) {
+            console.log("👀 Dados recebidos:", data); // <--- Adicione isso
             modalSalvar.hide(); // 👈 isso fecha o modal
             mostrarToast("✅ Plantão salvo com sucesso!");
             carregarPlantoesSalvos(); // opcional: recarrega a lista
@@ -478,6 +498,54 @@ function getCSRFToken() {
         .find(row => row.startsWith('csrftoken='))
         ?.split('=')[1];
 }
+function exibirPlantoesFiltrados(plantoes, anoSelecionado) {
+    const container = document.getElementById("listaPlantoesContainer");
+
+    const filtrados = anoSelecionado
+        ? plantoes.filter(p => new Date(p.criado_em).getFullYear().toString() === anoSelecionado)
+        : plantoes;
+
+    if (!filtrados.length) {
+        container.innerHTML = `<div class="alert alert-warning">Nenhum plantão encontrado para ${anoSelecionado || "qualquer ano"}.</div>`;
+        return;
+    }
+
+    let html = `<table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Período</th>
+                <th class="text-end">Ações</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+    filtrados.forEach(p => {
+        const dtIni = new Date(p.data_inicio).toLocaleDateString("pt-BR");
+        const dtFim = new Date(p.data_fim).toLocaleDateString("pt-BR");
+
+        html += `
+            <tr>
+                <td>${p.nome}</td>
+                <td>${dtIni} a ${dtFim}</td>
+                <td class="text-end">
+                    <button class="btn btn-secondary btn-sm me-1" onclick="openEditarPlantao(${p.id})">
+                        <i class="bi bi-pencil-square"></i> Alterar Servidor
+                    </button>
+                    <button class="btn btn-danger btn-sm me-1" onclick="excluirPlantao(${p.id})">
+                        <i class="bi bi-trash"></i> Excluir
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="imprimirPlantao(${p.id})">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
 function carregarPlantoesSalvos() {
     const container = document.getElementById("listaPlantoesContainer");
     container.innerHTML = `<div class="text-center my-3 text-muted">🔄 Carregando...</div>`;
@@ -490,42 +558,33 @@ function carregarPlantoesSalvos() {
                 return;
             }
 
-            let html = `<table class="table table-striped table-hover">
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Período</th>
-                        <th class="text-end">Ações</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+            const todosPlantoes = data.plantoes;
+            const anos = data.anos || [];
 
-            data.plantoes.forEach(p => {
-                const dtIni = new Date(p.data_inicio).toLocaleDateString("pt-BR");
-                const dtFim = new Date(p.data_fim).toLocaleDateString("pt-BR");
+            // 🟦 Preenche o select com os anos
+           
+            const ID_FILTRO_ANO = "filtroAno";
+            const filtroSelect = document.getElementById(ID_FILTRO_ANO);
+            if (filtroSelect && anos.length) {
+                filtroSelect.innerHTML = `<option value="">Todos os anos</option>`;
+                anos.forEach(ano => {
+                    const opt = document.createElement("option");
+                    opt.value = ano;
+                    opt.textContent = ano;
+                    filtroSelect.appendChild(opt);
+                });
 
-                html += `
-                    <tr>
-                        <td>${p.nome}</td>
-                        <td>${dtIni} a ${dtFim}</td>
+                // Evento onchange do select
+                filtroSelect.onchange = () => {
+                    const anoSelecionado = filtroSelect.value;
+                    exibirPlantoesFiltrados(todosPlantoes, anoSelecionado);
+                };
+            }
 
-                        <td class="text-end">
-                            <button class="btn btn-secondary btn-sm me-1" onclick="openEditarPlantao(${p.id})">
-                                <i class="bi bi-pencil-square"></i> Alterar Servidor
-                            </button>
-                            <button class="btn btn-danger btn-sm me-1" onclick="excluirPlantao(${p.id})">
-                                <i class="bi bi-trash"></i> Excluir
-                            </button>
-                            <button class="btn btn-primary btn-sm" onclick="imprimirPlantao(${p.id})">
-                                <i class="bi bi-printer"></i> Imprimir
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
-
-            html += `</tbody></table>`;
-            container.innerHTML = html;
+            // 🔄 Exibe inicialmente todos ou por ano atual
+            const anoAtual = new Date().getFullYear().toString();
+            filtroSelect.value = anoAtual;
+            exibirPlantoesFiltrados(todosPlantoes, anoAtual);
         })
         .catch(err => {
             console.error("Erro ao carregar plantões:", err);
@@ -623,6 +682,7 @@ function imprimirPlantao(id) {
             <style>
               @media print { .no-print { display: none; } }
               body { margin: 2cm; }
+              th, td { font-size: 15px; }
             </style>
           </head>
           <body>
@@ -636,18 +696,22 @@ function imprimirPlantao(id) {
                   <th>Semana Início</th>
                   <th>Semana Fim</th>
                   <th>Servidor</th>
+                  <th>Telefone</th>
                 </tr>
               </thead>
               <tbody>`;
 
       escala.forEach(item => {
         const srv = servidoresDisponiveis.find(s => s.id === item.servidor_id);
-        const nome = srv ? srv.nome : `ID ${item.servidor_id}`;
+        const nome = srv?.nome || `ID ${item.servidor_id}`;
+        const telefone = srv?.telefone || "-";
+
         html += `
           <tr>
             <td>${item.semana_inicio}</td>
             <td>${item.semana_fim}</td>
             <td>${nome}</td>
+            <td>${telefone}</td>
           </tr>`;
       });
 
@@ -661,9 +725,7 @@ function imprimirPlantao(id) {
               };
               window.onafterprint = () => window.close();
             </` + `script>
-          
-           
-            </body>
+          </body>
         </html>`;
 
       const printWindow = window.open('', '_blank');

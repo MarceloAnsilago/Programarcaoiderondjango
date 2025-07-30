@@ -9,4 +9,5 @@ urlpatterns = [
     path('editar/<int:id>/', views.editar_plantao, name='editar_plantao'),
     path('excluir/<int:id>/', views.excluir_plantao, name='excluir_plantao'),
     path('imprimir/<int:id>/', views.imprimir_plantao, name='imprimir_plantao'),
+    path('api/descansos-intervalo/', views.descansos_intervalo, name='descansos_intervalo'),
 ]

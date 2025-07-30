@@ -32,13 +32,24 @@ def salvar_plantao(request):
         if not (nome and data_inicio and data_fim and escala):
             return JsonResponse({'success': False, 'error': 'Dados incompletos'}, status=400)
 
-        conflitos = supabase.table("plantoes") \
+        # Corrige o problema: pega TODOS e filtra no Python com regra correta
+        conflitos_resp = supabase.table("plantoes") \
             .select("id, nome, data_inicio, data_fim") \
-            .or_(f"data_inicio.lte.{data_fim},data_fim.gte.{data_inicio}") \
             .execute()
 
-        if conflitos.data:
-            nomes_conflitantes = ", ".join([p['nome'] for p in conflitos.data])
+        conflitos_validos = []
+        for p in conflitos_resp.data:
+            ini = datetime.strptime(p["data_inicio"], "%Y-%m-%d").date()
+            fim = datetime.strptime(p["data_fim"], "%Y-%m-%d").date()
+
+            novo_ini = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+            novo_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+
+            if not (novo_fim < ini or novo_ini > fim):
+                conflitos_validos.append(p)
+
+        if conflitos_validos:
+            nomes_conflitantes = ", ".join([p['nome'] for p in conflitos_validos])
             return JsonResponse({
                 'success': False,
                 'error': f"Período informado conflita com os plantões: {nomes_conflitantes}"
@@ -108,13 +119,19 @@ def listar_plantoes(request):
 def detalhar_plantao(request, id):
     resp_p = supabase.table('plantoes').select('*').eq('id', id).single().execute()
     plantao = resp_p.data
+
     resp_e = supabase.table('escala_plantao').select('*').eq('plantao_id', id).order('semana_inicio').execute()
     escala = resp_e.data
-    # Servidores disponíveis podem vir do Supabase ou via API Django
-    resp_s = supabase.table('servidores').select('id, nome').execute()
+
+    # Agora também pegando telefone!
+    resp_s = supabase.table('servidores').select('id, nome, telefone').execute()
     servidores = resp_s.data
 
-    return JsonResponse({'plantao': plantao, 'escala': escala, 'servidoresDisponiveis': servidores})
+    return JsonResponse({
+        'plantao': plantao,
+        'escala': escala,
+        'servidoresDisponiveis': servidores
+    })
 
 
 @csrf_exempt
@@ -152,4 +169,50 @@ def imprimir_plantao(request, id):
 def excluir_plantao(request, id):
     supabase.table('escala_plantao').delete().eq('plantao_id', id).execute()
     supabase.table('plantoes').delete().eq('id', id).execute()
-    return JsonResponse({'success': True})    
+    return JsonResponse({'success': True})   
+
+
+@require_GET
+def descansos_intervalo(request):
+    data_ini = request.GET.get("data_inicial")
+    data_fim = request.GET.get("data_final")
+
+    if not data_ini or not data_fim:
+        return JsonResponse({"error": "Parâmetros obrigatórios"}, status=400)
+
+    try:
+        response = supabase.table("descansos") \
+            .select("*") \
+            .or_(f"data_inicio.lte.{data_fim},data_fim.gte.{data_ini}") \
+            .execute()
+
+        return JsonResponse(response.data, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+
+@require_GET
+
+
+@require_GET
+def listar_plantoes(request):
+    try:
+        response = supabase.table("plantoes").select("*").order("data_inicio", desc=False).execute()
+        data = response.data if hasattr(response, 'data') else []
+
+        # 🔍 Extrair apenas o ano do campo ISO `criado_em`
+        anos = sorted({
+            str(datetime.fromisoformat(p['criado_em']).year)
+            for p in data if 'criado_em' in p and p['criado_em']
+        })
+
+        return JsonResponse({'success': True, 'plantoes': data, 'anos': anos})
+    except Exception as e:
+        import traceback
+        print("[ERRO AO BUSCAR PLANTÕES]", str(e))
+        return JsonResponse({'success': False, 'error': str(e), 'trace': traceback.format_exc()})
+
+
+    
+    

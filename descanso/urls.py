@@ -11,5 +11,6 @@ urlpatterns = [
     # 👇 NOVOS ENDPOINTS PARA RELATÓRIOS
     path("api/descansos-semana/", descanso_views.descansos_na_semana, name="descansos_semana"),
     path("api/descansos-mes/", descanso_views.descansos_do_mes, name="descansos_mes"),
-    # path('api/descansos-intervalo/', descansos_intervalo, name='descansos_intervalo'),
+    path('api/descansos-intervalo/', descanso_views.descansos_intervalo, name='descansos_intervalo'),
+
 ]

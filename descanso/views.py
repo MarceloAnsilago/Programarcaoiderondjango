@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from supabase import create_client
 from datetime import datetime, timedelta  
 from django.http import JsonResponse
+from django.views.decorators.http import require_GET
 import calendar
 
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
@@ -344,3 +345,53 @@ def descansos_do_mes(request):
                 })
 
     return JsonResponse(resultado, safe=False)
+
+
+
+@require_GET
+def descansos_intervalo(request):
+    data_ini = request.GET.get("data_inicial")
+    data_fim = request.GET.get("data_final")
+    unidade_id = int(request.GET.get("unidade_id", 1))
+
+    if not data_ini or not data_fim:
+        return JsonResponse({"error": "Datas obrigatórias"}, status=400)
+
+    try:
+        # Converte para datetime.date
+        dt_ini = datetime.strptime(data_ini, "%Y-%m-%d").date()
+        dt_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+
+        # Servidores ativos
+        servidores = supabase.table("servidores") \
+            .select("id, nome") \
+            .eq("status", "Ativo") \
+            .eq("unidade_id", unidade_id) \
+            .execute().data
+
+        servidor_ids = [s["id"] for s in servidores]
+
+        descansos = supabase.table("descansos") \
+            .select("*") \
+            .in_("servidor_id", servidor_ids) \
+            .execute().data
+
+        resultado = []
+        for d in descansos:
+            ini = datetime.strptime(d["data_inicio"], "%Y-%m-%d").date()
+            fim = datetime.strptime(d["data_fim"], "%Y-%m-%d").date()
+            if fim < dt_ini or ini > dt_fim:
+                continue
+            servidor = next((s for s in servidores if s["id"] == d["servidor_id"]), None)
+            if servidor:
+                resultado.append({
+                    "nome": servidor["nome"],
+                    "tipo_descanso": d["tipo"],
+                    "data_inicio": ini.isoformat(),
+                    "data_fim": fim.isoformat()
+                })
+
+        return JsonResponse(resultado, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
