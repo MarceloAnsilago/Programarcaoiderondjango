@@ -8,6 +8,10 @@ SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+nomes_meses_pt = [
+    "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
 
 def lista_servidores_ativos(request):
     try:
@@ -80,7 +84,7 @@ def lista_servidores_ativos(request):
                     })
             meses.append({
                 "numero": mes,
-                "nome": calendar.month_name[mes].capitalize(),
+                "nome": nomes_meses_pt[mes],
                 "dias": dias_do_mes,
                 "linhas_servidor": linhas_servidor
             })
