@@ -1,13 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mt-4">
-    <h3>
-        <i class="bi bi-plus-circle" style="color:#073074"></i>
-        {% if is_edit %}Editar Descanso{% else %}Adicionar Descanso{% endif %}
-    </h3>
+<h3>
+    <i class="bi bi-plus-circle" style="color:#073074"></i>
+    {% if is_edit %}Editar Descanso{% else %}Adicionar Descanso{% endif %}
+</h3>
+
+{% if servidor_nome %}
+    <h5 class="text-muted mb-4">
+        <i class="bi bi-person-circle"></i> Servidor: <strong>{{ servidor_nome }}</strong>
+    </h5>
+{% endif %}
+
     {% if erro %}
         <div class="alert alert-danger">{{ erro }}</div>
     {% endif %}
+
     <form method="post">
         {% csrf_token %}
         <div class="row mb-3">
@@ -39,14 +47,24 @@
                     min="{% if request.POST.data_inicio %}{{ request.POST.data_inicio }}{% elif descanso and descanso.data_inicio %}{{ descanso.data_inicio }}{% endif %}">
             </div>
         </div>
+
         <div class="mb-3">
             <label for="observacao" class="form-label">Observação</label>
-            <textarea class="form-control" name="observacao" id="observacao" rows="2">{% if request.POST.observacao %}{{ request.POST.observacao }}{% elif descanso and descanso.observacao %}{{ descanso.observacao }}{% endif %}</textarea>
+            <textarea class="form-control" name="observacao" id="observacao" rows="2">
+                {% if request.POST.observacao %}{{ request.POST.observacao }}{% elif descanso and descanso.observacao %}{{ descanso.observacao }}{% endif %}
+            </textarea>
         </div>
-        <button type="submit" class="btn btn-success">
-            <i class="bi bi-check-circle"></i> Salvar
-        </button>
-        <a href="{% url 'lista_servidores_ativos' %}" class="btn btn-secondary ms-2">Voltar</a>
+
+        <!-- Botões -->
+        <div class="d-flex align-items-center gap-2">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Salvar
+            </button>
+
+            <a href="{% url 'lista_servidores_ativos' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left-circle"></i> Voltar
+            </a>
+        </div>
     </form>
 </div>
 {% endblock %}

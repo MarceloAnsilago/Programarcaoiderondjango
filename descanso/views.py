@@ -118,6 +118,11 @@ def adicionar_descanso(request, servidor_id):
     tipos_descanso = [
         "Férias", "Folga Compensatória", "Atestado", "Afastamento", "Licença", "Outros"
     ]
+
+    # 🔍 Buscar nome do servidor
+    servidor = supabase.table("servidores").select("nome").eq("id", servidor_id).single().execute().data
+    servidor_nome = servidor["nome"] if servidor else "Servidor não encontrado"
+
     if request.method == "POST":
         tipo = request.POST.get("tipo")
         data_inicio = request.POST.get("data_inicio")
@@ -131,6 +136,7 @@ def adicionar_descanso(request, servidor_id):
                 "tipos_descanso": tipos_descanso,
                 "erro": erro,
                 "is_edit": False,
+                "servidor_nome": servidor_nome,
             })
 
         data = {
@@ -152,17 +158,23 @@ def adicionar_descanso(request, servidor_id):
         "tipos_descanso": tipos_descanso,
         "erro": erro,
         "is_edit": False,
+        "servidor_nome": servidor_nome,
     })
-
 def editar_descanso(request, descanso_id):
     tipos_descanso = [
         "Férias", "Folga Compensatória", "Atestado", "Afastamento", "Licença", "Outros"
     ]
     erro = ""
+
+    # 🔍 Buscar o descanso
     resp = supabase.table("descansos").select("*").eq("id", descanso_id).single().execute()
     descanso = resp.data
     if not descanso:
         return redirect('lista_servidores_ativos')
+
+    # 🔍 Buscar nome do servidor associado ao descanso
+    servidor = supabase.table("servidores").select("nome").eq("id", descanso["servidor_id"]).single().execute().data
+    servidor_nome = servidor["nome"] if servidor else "Servidor não encontrado"
 
     if request.method == "POST":
         tipo = request.POST.get("tipo")
@@ -177,6 +189,7 @@ def editar_descanso(request, descanso_id):
                 "tipos_descanso": tipos_descanso,
                 "erro": erro,
                 "is_edit": True,
+                "servidor_nome": servidor_nome,
             })
 
         supabase.table("descansos").update({
@@ -185,6 +198,7 @@ def editar_descanso(request, descanso_id):
             "data_fim": data_fim,
             "observacao": observacao
         }).eq("id", descanso_id).execute()
+
         return redirect('lista_servidores_ativos')
 
     return render(request, "adicionar_descanso.html", {
@@ -192,6 +206,7 @@ def editar_descanso(request, descanso_id):
         "tipos_descanso": tipos_descanso,
         "erro": erro,
         "is_edit": True,
+        "servidor_nome": servidor_nome,
     })
 
 def excluir_descanso(request, descanso_id):
