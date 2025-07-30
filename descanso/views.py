@@ -306,10 +306,13 @@ def descansos_na_semana(request):
         if fim < ini_semana or ini > fim_semana:
             continue
         servidor = next((s for s in servidores if s["id"] == d["servidor_id"]), None)
+       
         if servidor:
             resultado.append({
                 "nome": servidor["nome"],
-                "tipo_descanso": d["tipo"]
+                "tipo_descanso": d["tipo"],
+                "data_inicio": d.get("data_inicio"),
+                "data_fim": d.get("data_fim")
             })
 
     return JsonResponse(resultado, safe=False)
@@ -339,9 +342,12 @@ def descansos_do_mes(request):
         if ini.year == ano and ini.month == mes or fim.year == ano and fim.month == mes:
             servidor = next((s for s in servidores if s["id"] == d["servidor_id"]), None)
             if servidor:
+              
                 resultado.append({
                     "nome": servidor["nome"],
-                    "tipo_descanso": d["tipo"]
+                    "tipo_descanso": d["tipo"],
+                    "data_inicio": d.get("data_inicio"),
+                    "data_fim": d.get("data_fim")
                 })
 
     return JsonResponse(resultado, safe=False)

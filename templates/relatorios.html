@@ -708,10 +708,21 @@ function carregarProgramacaoSemana() {
 
 
 function carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes) {
+  console.log("📡 Iniciando chamada para descansos da semana:", unidade_id, semanaIdx, ano, mes);
+  
   return fetch(`/descanso/api/descansos-semana/?unidade_id=${unidade_id}&semana=${semanaIdx}&ano=${ano}&mes=${mes}`)
-    .then(resp => resp.json())
+    .then(resp => {
+      console.log("✅ Resposta recebida");
+      return resp.json();
+    })
     .then(descansos => {
-      if (!descansos || descansos.length === 0) return '';
+      console.log("🗂️ Dados recebidos:", descansos);
+
+      if (!descansos || descansos.length === 0) {
+        console.warn("⚠️ Nenhum descanso encontrado.");
+        return '';
+      }
+
       return `
         <div class="mt-4">
           <h6 class="text-warning fw-bold text-center">
@@ -727,9 +738,8 @@ function carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes) {
             </thead>
             <tbody>
               ${descansos.map(d => {
-                // converte data de ISO para dd/mm/aaaa
-                const ini = new Date(d.data_inicio).toLocaleDateString('pt-BR');
-                const fim = new Date(d.data_fim).toLocaleDateString('pt-BR');
+                const ini = d.data_inicio ? new Date(d.data_inicio).toLocaleDateString('pt-BR') : '-';
+                const fim = d.data_fim ? new Date(d.data_fim).toLocaleDateString('pt-BR') : '-';
                 return `<tr><td>${d.nome}</td><td>${d.tipo_descanso}</td><td>${ini} a ${fim}</td></tr>`;
               }).join('')}
             </tbody>
@@ -737,11 +747,10 @@ function carregarBlocoDescansoSemana(unidade_id, semanaIdx, ano, mes) {
         </div>`;
     })
     .catch(err => {
-      console.error("Erro ao buscar descansos da semana:", err);
+      console.error("❌ Erro ao buscar descansos da semana:", err);
       return '';
     });
 }
-
 function carregarBlocoDescansoMensal(unidade_id, ano, mes) {
   return fetch(`/descanso/api/descansos-mes/?unidade_id=${unidade_id}&ano=${ano}&mes=${mes}`)
     .then(resp => resp.json())
