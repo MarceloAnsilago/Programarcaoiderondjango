@@ -611,7 +611,8 @@ function carregarProgramacaoSemana() {
                 Object.entries(data.programacoes)
                     .sort(([dataA], [dataB]) => new Date(dataA.split('-').reverse().join('-')) - new Date(dataB.split('-').reverse().join('-')))
                     .forEach(([dataStr, atividades]) => {
-                        let dt = new Date(dataStr);
+                        let partes = dataStr.split('-');
+                        let dt = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
                         let diaSemana = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
                         diaSemana = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
                         let dataExt = dt.toLocaleDateString();
@@ -679,7 +680,7 @@ function carregarProgramacaoSemana() {
                     container.innerHTML += `
                         <hr style="margin-top: 0; margin-bottom: 20px; border-color: #ccc;">
                         <div class="alert alert-info text-center mt-4 mb-2" style="font-size: 1.1rem;">
-                            🛡️ <strong>Plantonista da Semana:</strong> ${data.plantonista}
+                            🛡️ <strong>Plantão para recebimento de vacinas e produtos biológicos:</strong> ${data.plantonista}
                         </div>
                     `;
                 } else {

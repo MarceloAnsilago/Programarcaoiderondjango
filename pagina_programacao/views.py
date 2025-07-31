@@ -179,20 +179,27 @@ def resumo_alocacoes(request):
 
 def get_semanas_do_mes(ano, mes):
     semanas = []
-    d = date(ano, mes, 1)
-    while d.month == mes:
-        inicio = d
-        fim = inicio + timedelta(days=6 - inicio.weekday())
 
-        # CORRIGIDO: Usa último dia do mês
-        ultimo_dia = monthrange(ano, mes)[1]
-        if fim.month != mes:
-            fim = date(ano, mes, ultimo_dia)
+    # Primeiro dia do mês
+    primeiro_dia_mes = date(ano, mes, 1)
+
+    # Retroceder até o domingo anterior
+    dia_semana = primeiro_dia_mes.weekday()  # segunda = 0, domingo = 6
+    dias_retroceder = (dia_semana + 1) % 7
+    d = primeiro_dia_mes - timedelta(days=dias_retroceder)
+
+    while d.month <= mes:
+        inicio = d
+        fim = inicio + timedelta(days=6)
 
         semanas.append((inicio, fim))
         d = fim + timedelta(days=1)
-    return semanas
 
+        # Parar se o mês do próximo início for maior
+        if d.month > mes and d.day > 7:
+            break
+
+    return semanas
 def pagina_programacao(request):
     # Pega mês e ano do GET ou usa atual
     ano = int(request.GET.get('ano', date.today().year))
@@ -521,7 +528,6 @@ def relatorio_mensal(request):
 
 
 
-@csrf_exempt
 @csrf_exempt
 def excluir_programacao(request):
     if request.method == 'POST':

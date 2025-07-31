@@ -218,10 +218,6 @@ def descansos_intervalo(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     
-
-@require_GET
-
-
 @require_GET
 def listar_plantoes(request):
     try:
