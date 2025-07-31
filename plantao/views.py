@@ -7,6 +7,7 @@ from supabase import create_client
 from django.views.decorators.http import require_GET
 from django.views.decorators.http import require_http_methods
 from datetime import datetime
+from datetime import datetime, timedelta
 # Configurações do Supabase
 SUPABASE_URL = "https://pqhzafiucqqevbnsgwcr.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxaHphZml1Y3FxZXZibnNnd2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MjQ1MDksImV4cCI6MjA2NjMwMDUwOX0.VOhtsri0IiQgLdGpTCZqZZe_aufHhbOlDx4GqkYMy0M"
@@ -16,6 +17,36 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 def pagina_plantao(request):
     return render(request, 'plantao.html')
 
+# --- Função utilitária para nomear semanas ---
+def nomear_semana(data_str):
+    try:
+        # Converter a data fornecida
+        data = datetime.strptime(data_str, "%Y-%m-%d").date()
+
+        # Primeiro dia do mês
+        primeiro_dia_mes = data.replace(day=1)
+
+        # Retroagir até o domingo anterior ou o próprio domingo
+        primeiro_dia_semana = primeiro_dia_mes - timedelta(days=primeiro_dia_mes.weekday() + 1) \
+            if primeiro_dia_mes.weekday() != 6 else primeiro_dia_mes
+
+        # Calcular diferença em dias entre a data e o primeiro domingo
+        dias_passados = (data - primeiro_dia_semana).days
+
+        # Calcular índice da semana visual
+        semana_idx = dias_passados // 7
+
+        nomes = [
+            "Primeira semana", "Segunda semana", "Terceira semana",
+            "Quarta semana", "Quinta semana", "Sexta semana"
+        ]
+        return nomes[semana_idx] if semana_idx < len(nomes) else f"{semana_idx + 1}ª semana"
+
+    except Exception as e:
+        print("[ERRO AO NOMEAR SEMANA]", str(e))
+        return "Semana indefinida"
+
+# --- View salvar_plantao ---
 @csrf_exempt
 def salvar_plantao(request):
     if request.method != "POST":
@@ -32,18 +63,18 @@ def salvar_plantao(request):
         if not (nome and data_inicio and data_fim and escala):
             return JsonResponse({'success': False, 'error': 'Dados incompletos'}, status=400)
 
-        # Corrige o problema: pega TODOS e filtra no Python com regra correta
+        # Buscar plantões existentes para verificar conflitos
         conflitos_resp = supabase.table("plantoes") \
             .select("id, nome, data_inicio, data_fim") \
             .execute()
 
         conflitos_validos = []
+        novo_ini = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+        novo_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+
         for p in conflitos_resp.data:
             ini = datetime.strptime(p["data_inicio"], "%Y-%m-%d").date()
             fim = datetime.strptime(p["data_fim"], "%Y-%m-%d").date()
-
-            novo_ini = datetime.strptime(data_inicio, "%Y-%m-%d").date()
-            novo_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
 
             if not (novo_fim < ini or novo_ini > fim):
                 conflitos_validos.append(p)
@@ -55,6 +86,7 @@ def salvar_plantao(request):
                 'error': f"Período informado conflita com os plantões: {nomes_conflitantes}"
             }, status=400)
 
+        # Inserir novo plantão
         response = supabase.table("plantoes").insert([{
             "nome": nome,
             "data_inicio": data_inicio,
@@ -67,6 +99,7 @@ def salvar_plantao(request):
 
         plantao_id = response.data[0]['id']
 
+        # Inserir escala
         for item in escala:
             servidor_id = item.get('servidor_id')
             semana_inicio = item.get('semana_inicio')
@@ -75,12 +108,7 @@ def salvar_plantao(request):
             if not servidor_id or not semana_inicio or not semana_fim:
                 continue
 
-            semana_dt = datetime.strptime(semana_inicio, "%Y-%m-%d")
-            semana_idx = (semana_dt.day - 1) // 7
-            nome_da_semana = [
-                "Primeira semana", "Segunda semana", "Terceira semana",
-                "Quarta semana", "Quinta semana", "Sexta semana"
-            ][semana_idx] if semana_idx < 6 else f"{semana_idx + 1}ª semana"
+            nome_da_semana = nomear_semana(semana_inicio)
 
             escala_result = supabase.table("escala_plantao").insert([{
                 "plantao_id": plantao_id,
@@ -93,7 +121,6 @@ def salvar_plantao(request):
             if not escala_result.data:
                 raise Exception("Erro ao salvar uma semana da escala.")
 
-        # ✅ AGORA FORA DO LOOP
         return JsonResponse({'success': True, 'plantao_id': plantao_id})
 
     except Exception as e:
